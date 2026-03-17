@@ -1,0 +1,4 @@
+anthropic
+biopython
+pandas
+numpy
