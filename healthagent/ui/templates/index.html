@@ -389,21 +389,29 @@ body {
   align-self: flex-start;
 }
 
-/* Your result */
-.card-result {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.3;
+/* Your result — the visual centrepiece */
+.card-finding {
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  border-left: 3px solid var(--finding-color, #6366f1);
 }
-.card-result-label {
-  font-size: 0.72rem;
+.card-finding-label {
+  font-size: 0.67rem;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   color: var(--muted);
-  font-weight: 500;
-  margin-bottom: 0.2rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
 }
+.card-result {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--finding-color, var(--text));
+  line-height: 1.4;
+}
+/* Keep backward-compat label hidden */
+.card-result-label { display: none; }
 
 /* Detail text */
 .card-detail {
@@ -1628,7 +1636,6 @@ const TraitUI = {
 
   buildCard(trait) {
     const cat = this.getCatInfo(trait.category);
-    // Prefer backend-supplied colors if available
     const catColor = trait.category_color || cat.color;
     const catBg    = cat.bg;
 
@@ -1637,45 +1644,54 @@ const TraitUI = {
     card.style.setProperty('--cat-color', catColor);
     card.style.setProperty('--cat-bg', catBg);
 
-    // Risk badge styling
-    const riskColor  = trait.risk_color || '#94a3b8';
-    const riskBg     = trait.risk_bg    || 'rgba(148,163,184,0.12)';
-    const riskLabel  = trait.risk_label || trait.risk_level || '';
+    // Finding colour — drives the result box accent
+    const riskColor = trait.risk_color || trait.severity_color || catColor;
+    const riskBg    = trait.risk_bg    || 'rgba(148,163,184,0.08)';
+    const riskLabel = trait.risk_label || '';
+    card.style.setProperty('--finding-color', riskColor);
 
-    // Icon: prefer trait icon, fallback to category emoji
-    const icon = trait.icon || cat.label.split(' ')[0];
+    const icon     = trait.icon || cat.label.split(' ')[0];
     const catLabel = trait.category_label || cat.label.replace(/^[^\s]+ /, '');
+
+    // Detail id — fall back to a random key when rsid absent (GWAS rows may lack unique rsid)
+    const detailId = safeId(trait.rsid || trait.trait_name || Math.random().toString(36).slice(2));
 
     card.innerHTML = `
       <div class="trait-card-inner">
+
+        <!-- ① Header: icon + trait topic + category label -->
         <div class="card-header">
           <div class="card-icon" style="background:${catBg};border:1px solid ${catColor}22;">
             <span>${icon}</span>
           </div>
           <div class="card-title-group">
-            <div class="card-trait-name">${escHtml(trait.trait_name || 'Unknown Trait')}</div>
+            <div class="card-trait-name">${escHtml(trait.trait_name || 'Trait')}</div>
             <div class="card-category-label" style="color:${catColor}">${escHtml(catLabel)}</div>
           </div>
           ${riskLabel ? `<span class="risk-badge" style="color:${riskColor};background:${riskBg};border:1px solid ${riskColor}33;">${escHtml(riskLabel)}</span>` : ''}
         </div>
 
+        <!-- ② Finding box: the personal result, coloured by risk level -->
         ${trait.your_result ? `
-        <div>
-          <div class="card-result-label">Your result</div>
+        <div class="card-finding">
+          <div class="card-finding-label">What this means for you</div>
           <div class="card-result">${escHtml(trait.your_result)}</div>
         </div>` : ''}
 
+        <!-- ③ Background detail: collapsed by default -->
         ${trait.detail ? `
         <div>
-          <div class="card-detail" id="detail-${safeId(trait.rsid)}">${escHtml(trait.detail)}</div>
-          <span class="expand-toggle" onclick="toggleDetail('${safeId(trait.rsid)}', this)">Show more ↓</span>
+          <div class="card-detail" id="detail-${detailId}">${escHtml(trait.detail)}</div>
+          <span class="expand-toggle" onclick="toggleDetail('${detailId}', this)">Why? Show more ↓</span>
         </div>` : ''}
 
+        <!-- ④ Action advice -->
         ${trait.what_to_do ? `
         <div class="card-action">
           <div class="card-action-header">💡 What you can do</div>
           <div class="card-action-text">${escHtml(trait.what_to_do)}</div>
         </div>` : ''}
+
       </div>
 
       <div class="card-footer">

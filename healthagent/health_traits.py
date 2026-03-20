@@ -81,10 +81,10 @@ def analyze_profile(profile: "DNAProfile") -> dict:
             continue  # skip unknown/empty GWAS records
         gwas.append({
             **row,
-            "trait_name":   trait_name,
+            "trait_name":   trait_name.title(),
             "category":     "gwas",
-            "detail":       f"{row.get('study_title', '')} (p={_fmt_pval(row.get('p_value'))})",
-            "your_result":  f"OR: {_fmt_or(row.get('odds_ratio'))}  Risk allele: {row.get('risk_allele', '—')}",
+            "detail":       row.get("study_title") or "",
+            "your_result":  _gwas_plain_result(row.get("odds_ratio"), row.get("risk_allele")),
             "p_value_fmt":  _fmt_pval(row.get("p_value")),
             "or_fmt":       _fmt_or(row.get("odds_ratio")),
         })
@@ -131,12 +131,14 @@ def analyze_profile(profile: "DNAProfile") -> dict:
         if not drug_name:
             continue
         gene = row.get("gene") or ""
+        phenotype = row.get("phenotype") or ""
         drugs.append({
             **row,
-            "trait_name": f"{drug_name}" + (f" ({gene})" if gene else ""),
-            "category":   "medications",
-            "your_result": row.get("phenotype") or "",
-            "detail":      row.get("plain_english") or row.get("phenotype") or "",
+            "trait_name":  drug_name,
+            "category":    "medications",
+            "your_result": _drug_plain_result(phenotype, row.get("category")),
+            "detail":      row.get("plain_english") or phenotype,
+            "what_to_do":  f"Speak to your doctor or pharmacist before taking {drug_name}. Your genetic profile may affect how this medication works for you.",
         })
 
     # ── DisGeNET gene-disease associations ────────────────────────
@@ -270,3 +272,43 @@ def _clinvar_color(sig: str) -> str:
     if "Benign" in sig:
         return "#22c55e"
     return "#6b7280"
+
+
+def _gwas_plain_result(odds_ratio, risk_allele) -> str:
+    """Turn a raw odds ratio into a plain-English sentence a non-scientist can understand."""
+    try:
+        or_val = float(odds_ratio)
+    except (TypeError, ValueError):
+        return "A DNA variant near this gene has been linked to this trait in research studies."
+
+    allele_note = f" (variant: {risk_allele})" if risk_allele and risk_allele not in ("—", "", "?") else ""
+    if or_val >= 2.0:
+        return f"Your DNA variant{allele_note} is associated with roughly {or_val:.1f}× higher likelihood of this trait in research studies."
+    elif or_val >= 1.2:
+        pct = int((or_val - 1) * 100)
+        return f"Research links your DNA variant{allele_note} to about {pct}% higher likelihood of this trait compared to average."
+    elif or_val >= 0.95:
+        return f"Your DNA variant{allele_note} shows little difference from average for this trait in research studies."
+    elif or_val >= 0.5:
+        pct = int((1 - or_val) * 100)
+        return f"Your DNA variant{allele_note} is associated with roughly {pct}% lower likelihood of this trait compared to average."
+    else:
+        return f"Your DNA variant{allele_note} is strongly associated with reduced likelihood of this trait in research studies."
+
+
+def _drug_plain_result(phenotype: str, category: str) -> str:
+    """Convert a pharmacogenomics phenotype to a short plain-English finding."""
+    if not phenotype:
+        return "Your DNA may affect how your body responds to this medication."
+    ph = phenotype.lower()
+    if "poor" in ph or "slow" in ph or "decreased" in ph or "reduced" in ph:
+        return f"Your body may process this medication more slowly than average — it can build up to higher levels."
+    if "rapid" in ph or "ultra" in ph or "fast" in ph or "increased" in ph:
+        return f"Your body may break down this medication faster than average — it may wear off sooner."
+    if "intermediate" in ph:
+        return f"Your body processes this medication at a slightly below-average rate."
+    if "toxicity" in ph or "adverse" in ph or "risk" in ph:
+        return f"Your DNA variant is linked to a higher risk of side effects with this medication."
+    if "efficacy" in ph or "response" in ph or "effective" in ph:
+        return f"This medication may work differently for you based on your genetic profile."
+    return phenotype
