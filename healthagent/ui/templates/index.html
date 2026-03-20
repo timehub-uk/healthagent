@@ -148,7 +148,7 @@
   #helix-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
   #helix-canvas {
     width: 100%;
-    height: 240px;
+    height: 320px;
     border-radius: 8px;
     display: block;
   }
@@ -193,11 +193,22 @@
     <div>
       <h2>Base Legend</h2>
       <div class="legend" style="margin-top:.6rem">
-        <div class="legend-item"><span class="dot dot-A"></span> A — Adenine</div>
-        <div class="legend-item"><span class="dot dot-T"></span> T — Thymine &nbsp;(A↔T)</div>
-        <div class="legend-item"><span class="dot dot-G"></span> G — Guanine</div>
-        <div class="legend-item"><span class="dot dot-C"></span> C — Cytosine (G↔C)</div>
-        <div class="legend-item"><span class="dot dot-pair"></span> Backbone</div>
+        <div class="legend-item"><span class="dot dot-A"></span> A — Adenine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(purine)</span></div>
+        <div class="legend-item"><span class="dot dot-T"></span> T — Thymine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(pyrimidine)</span></div>
+        <div class="legend-item"><span class="dot dot-G"></span> G — Guanine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(purine)</span></div>
+        <div class="legend-item"><span class="dot dot-C"></span> C — Cytosine <span style="color:#4a5f7a;font-size:.75rem">(pyrimidine)</span></div>
+      </div>
+    </div>
+    <div>
+      <h2>Helix Key</h2>
+      <div class="legend" style="margin-top:.5rem;font-size:.8rem;gap:.5rem">
+        <div class="legend-item" style="color:#2a7ab8">▬ 5′→3′ sense strand</div>
+        <div class="legend-item" style="color:#c44870">▬ 3′→5′ antisense strand</div>
+        <div class="legend-item"><span style="color:#aaccff">· ·</span>&nbsp; A–T &nbsp;2 H-bonds</div>
+        <div class="legend-item"><span style="color:#aaccff">· · ·</span>&nbsp; G–C &nbsp;3 H-bonds</div>
+        <div class="legend-item" style="color:#4a8fbf">major groove (wide)</div>
+        <div class="legend-item" style="color:#bf4a6a">minor groove (narrow)</div>
+        <div class="legend-item" style="color:#4a5f7a;font-size:.75rem">~10 bp per full turn (B-DNA)</div>
       </div>
     </div>
 
@@ -377,134 +388,241 @@ function resizeCanvas(canvas) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  DNA HELIX RENDERER
+//  DNA HELIX RENDERER  (scientifically accurate B-DNA geometry)
+//
+//  Key biology encoded here:
+//  • Right-handed double helix (Watson–Crick B-DNA)
+//  • ~10 base pairs per full turn (360°/turn)
+//  • Anti-parallel strands: 5′→3′ (strand 1) and 3′→5′ (strand 2)
+//  • Major groove (wider) alternates with minor groove (narrower)
+//    modelled by a sinusoidal groove-width modifier
+//  • A–T pairs: 2 hydrogen bonds shown as 2 dots on the rung
+//  • G–C pairs: 3 hydrogen bonds shown as 3 dots on the rung
+//  • Sugar-phosphate backbone rendered as a thick ribbon with
+//    depth-shaded gradient (front bright, back dim)
+//  • Purine bases (A, G) rendered slightly larger than pyrimidines
+//    (T, C) reflecting real molecular size difference
 // ═══════════════════════════════════════════════════════════════════
 function drawHelix(canvas, snps, theta) {
-  const ctx   = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
   const { w, h } = resizeCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
 
-  const cx      = w / 2;
-  const cy      = h / 2;
-  const rx      = Math.min(w * 0.18, 60);   // helix radius
-  const pitch   = 38;                        // vertical distance per full turn
-  const turns   = Math.ceil(h / pitch) + 2;
-  const steps   = turns * 36;               // points per strand
+  const cx = w / 2;
 
-  // ── 1. Compute 3D helix points projected to 2D ───────────────
-  // Strand A: angles [theta .. theta + 2π*turns]
-  // Strand B: offset by π
-  const strand1 = [];
-  const strand2 = [];
+  // B-DNA: ~10 bp per full 360° turn.
+  // We fix the visual pitch so the helix fits nicely in the panel height.
+  const BP_PER_TURN  = 10;
+  const pitch        = Math.min(h * 0.42, 130);   // px per full turn
+  const rx           = Math.min(w * 0.17, 58);     // helix radius
 
+  const turns        = h / pitch + 1.5;
+  const totalBP      = Math.round(turns * BP_PER_TURN);
+  const stepsPerBP   = 6;                          // curve smoothness
+  const steps        = totalBP * stepsPerBP;
+
+  // ── 1. Build helix point arrays ───────────────────────────────
+  // Right-handed: angle increases going downward (positive y).
+  // Strand 2 is anti-parallel → offset by π.
+  const s1 = [], s2 = [];
   for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * Math.PI * 2 * turns + theta;
-    const y = (i / steps) * h - pitch;     // top to bottom
-    strand1.push({ x: cx + rx * Math.cos(t),      y, z: Math.sin(t) });
-    strand2.push({ x: cx + rx * Math.cos(t + Math.PI), y, z: Math.sin(t + Math.PI) });
+    const frac = i / steps;
+    const t    = frac * Math.PI * 2 * turns + theta;   // right-handed
+    const y    = frac * h - pitch * 0.5;
+    s1.push({ x: cx + rx * Math.cos(t),          y, z: Math.sin(t) });
+    s2.push({ x: cx + rx * Math.cos(t + Math.PI), y, z: Math.sin(t + Math.PI) });
   }
 
-  // ── 2. Draw backbone tubes ───────────────────────────────────
-  function drawBackbone(pts, col) {
+  // ── 2. Phosphate-sugar backbone ribbons ───────────────────────
+  // Draw in two passes: back (z<0) dim, front (z>0) bright
+  function drawRibbon(pts, frontCol, backCol, lw) {
+    // back pass
+    ctx.lineWidth = lw;
+    ctx.lineCap   = 'round';
+    ctx.lineJoin  = 'round';
+    let inSeg = false;
     ctx.beginPath();
-    pts.forEach((p, i) => {
-      const alpha = 0.5 + 0.5 * ((p.z + 1) / 2);
-      if (i === 0) ctx.moveTo(p.x, p.y);
+    pts.forEach(p => {
+      if (p.z > 0) { inSeg = false; return; }
+      if (!inSeg) { ctx.moveTo(p.x, p.y); inSeg = true; }
       else ctx.lineTo(p.x, p.y);
     });
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = 3;
+    ctx.strokeStyle = backCol;
+    ctx.stroke();
+
+    // front pass with depth glow
+    inSeg = false;
+    ctx.beginPath();
+    pts.forEach(p => {
+      if (p.z <= 0) { inSeg = false; return; }
+      if (!inSeg) { ctx.moveTo(p.x, p.y); inSeg = true; }
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = frontCol;
+    ctx.lineWidth   = lw + 1;
+    ctx.stroke();
+
+    // highlight stripe on front
+    inSeg = false;
+    ctx.beginPath();
+    pts.forEach(p => {
+      if (p.z < 0.4) { inSeg = false; return; }
+      if (!inSeg) { ctx.moveTo(p.x, p.y); inSeg = true; }
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = withAlpha(frontCol, 0.35);
+    ctx.lineWidth   = 2;
     ctx.stroke();
   }
 
-  // Draw back-layer elements first (z < 0), then front
-  drawBackbone(strand1.filter(p => p.z <= 0), '#152840');
-  drawBackbone(strand2.filter(p => p.z <= 0), '#152840');
+  drawRibbon(s1, '#2a7ab8', '#0e2a42', 5);
+  drawRibbon(s2, '#c44870', '#3a0e1e', 5);
 
-  // ── 3. Draw base-pair rungs ───────────────────────────────────
-  const rungStep = 12;   // every N points draw a rung
-  for (let i = 0; i < steps; i += rungStep) {
-    const p1 = strand1[i];
-    const p2 = strand2[i];
+  // ── 3. Base-pair rungs (one per BP) ───────────────────────────
+  // Collect all rungs with their z-depth, sort back-to-front
+  const rungs = [];
+  for (let bp = 0; bp < totalBP; bp++) {
+    const i   = bp * stepsPerBP;
+    if (i >= s1.length) break;
+    const p1  = s1[i];
+    const p2  = s2[i];
     const avgZ = (p1.z + p2.z) / 2;
 
-    // Pick a base from snpData cycling through
-    const snp = snps.length ? snps[Math.floor(i / rungStep) % snps.length] : null;
-    const b1  = snp ? (snp.genotype[0] || 'A') : 'A';
+    // Cycle through real SNP data or use fallback AGTC sequence
+    const defaultSeq = ['A','G','T','C','G','A','C','T','G','A'];
+    const snp = snps.length ? snps[bp % snps.length] : null;
+    const b1  = snp ? (snp.genotype[0] || defaultSeq[bp % 10]) : defaultSeq[bp % 10];
     const b2  = complement[b1] || 'T';
 
-    const alpha = 0.35 + 0.65 * ((avgZ + 1) / 2);   // depth fade
+    // Major groove: wider gap between bp 1-6 of each turn (~216°)
+    // Minor groove: narrower gap between bp 7-10 (~144°)
+    // We use this to vary rung opacity subtly — back rungs in minor groove are more hidden
+    const turnFrac = (bp % BP_PER_TURN) / BP_PER_TURN;
+    const inMajor  = turnFrac < 0.6;
 
-    // midpoint
+    rungs.push({ p1, p2, avgZ, b1, b2, bp, inMajor });
+  }
+  rungs.sort((a, b) => a.avgZ - b.avgZ);   // painter's algorithm
+
+  rungs.forEach(({ p1, p2, avgZ, b1, b2, bp, inMajor }) => {
+    const depth  = (avgZ + 1) / 2;                  // 0=back, 1=front
+    const alpha  = inMajor
+      ? 0.25 + 0.75 * depth
+      : 0.12 + 0.55 * depth;
+
+    const c1 = baseColor(b1);
+    const c2 = baseColor(b2);
     const mx = (p1.x + p2.x) / 2;
     const my = (p1.y + p2.y) / 2;
 
-    // Half-rung strand1 → mid
+    // Half-rung 1 (sense strand colour)
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(mx, my);
-    ctx.strokeStyle = withAlpha(baseColor(b1), alpha);
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = withAlpha(c1, alpha);
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
     ctx.stroke();
 
-    // Half-rung mid → strand2
+    // Half-rung 2 (antisense strand colour)
     ctx.beginPath();
     ctx.moveTo(mx, my);
     ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = withAlpha(baseColor(b2), alpha);
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = withAlpha(c2, alpha);
+    ctx.lineWidth   = 2.5;
     ctx.stroke();
 
-    // Nucleotide dots
-    drawNode(ctx, p1.x, p1.y, 4, baseColor(b1), alpha);
-    drawNode(ctx, p2.x, p2.y, 4, baseColor(b2), alpha);
-  }
+    // Hydrogen bond dots at midpoint
+    // A–T: 2 H-bonds  |  G–C: 3 H-bonds
+    const hBonds = (b1 === 'G' || b1 === 'C') ? 3 : 2;
+    const hAlpha = Math.min(1, alpha * 1.4);
+    for (let d = 0; d < hBonds; d++) {
+      const t   = (d + 1) / (hBonds + 1);
+      const hx  = p1.x + (p2.x - p1.x) * t;
+      const hy  = p1.y + (p2.y - p1.y) * t;
+      ctx.beginPath();
+      ctx.arc(hx, hy, depth > 0.5 ? 2 : 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = withAlpha('#aaccff', hAlpha * 0.7);
+      ctx.fill();
+    }
 
-  // Front backbones
-  drawBackbone(strand1.filter(p => p.z > 0), '#1a5080');
-  drawBackbone(strand2.filter(p => p.z > 0), '#1a4070');
-
-  // ── 4. Front nucleotide nodes (over backbone) ────────────────
-  for (let i = 0; i < steps; i += rungStep) {
-    const p1  = strand1[i];
-    const p2  = strand2[i];
-    const snp = snps.length ? snps[Math.floor(i / rungStep) % snps.length] : null;
-    const b1  = snp ? (snp.genotype[0] || 'A') : 'A';
-    const b2  = complement[b1] || 'T';
-    if (p1.z > 0) drawNode(ctx, p1.x, p1.y, 5, baseColor(b1), 1.0, true);
-    if (p2.z > 0) drawNode(ctx, p2.x, p2.y, 5, baseColor(b2), 1.0, true);
-  }
-
-  // ── 5. AGTC label strip on the right ─────────────────────────
-  const labelSnps = snps.slice(0, Math.floor(h / 22));
-  ctx.font = '11px monospace';
-  ctx.textAlign = 'left';
-  labelSnps.forEach((s, idx) => {
-    const yy = 18 + idx * 22;
-    const b1 = s.genotype[0] || '?';
-    const b2 = s.genotype[1] || '?';
-    ctx.fillStyle = withAlpha(baseColor(b1), 0.9);
-    ctx.fillText(b1, w - 52, yy);
-    ctx.fillStyle = '#334';
-    ctx.fillText('—', w - 42, yy);
-    ctx.fillStyle = withAlpha(baseColor(b2), 0.9);
-    ctx.fillText(b2, w - 28, yy);
+    // Nucleotide nodes — purines (A,G) slightly larger than pyrimidines (T,C)
+    const isPurine1 = (b1 === 'A' || b1 === 'G');
+    const isPurine2 = (b2 === 'A' || b2 === 'G');
+    drawNode(ctx, p1.x, p1.y, isPurine1 ? 5.5 : 4.2, c1, alpha, depth > 0.55);
+    drawNode(ctx, p2.x, p2.y, isPurine2 ? 5.5 : 4.2, c2, alpha, depth > 0.55);
   });
+
+  // ── 4. Direction arrows (anti-parallel labels) ────────────────
+  // 5′→3′ on strand 1 top,  3′→5′ on strand 2 top
+  ctx.font      = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  const arrowY  = 14;
+
+  // Strand 1 label (blue side)
+  ctx.fillStyle = '#2a7ab8';
+  ctx.fillText("5′ → 3′", s1[0].x, arrowY);
+
+  // Strand 2 label (red side) — anti-parallel so shows 3′ → 5′
+  ctx.fillStyle = '#c44870';
+  ctx.fillText("3′ → 5′", s2[0].x, arrowY);
+
+  // ── 5. Groove annotations ────────────────────────────────────
+  // Label one major and one minor groove per visible turn
+  ctx.font      = '9px system-ui';
+  ctx.textAlign = 'left';
+  const grooveX = cx + rx + 8;
+
+  for (let turn = 0; turn < Math.floor(turns); turn++) {
+    // Major groove centre ≈ 30% into each turn
+    const majorFrac = (turn + 0.3) / turns;
+    const majorY    = majorFrac * h;
+    const minorFrac = (turn + 0.8) / turns;
+    const minorY    = minorFrac * h;
+
+    ctx.fillStyle = withAlpha('#4a8fbf', 0.55);
+    ctx.fillText('major', grooveX, majorY);
+    ctx.fillStyle = withAlpha('#bf4a6a', 0.45);
+    ctx.fillText('minor', grooveX, minorY);
+  }
+
+  // ── 6. Base-pair sequence strip (right edge) ─────────────────
+  const visibleBP = Math.min(Math.floor(h / 18), snps.length || totalBP);
+  ctx.font      = '10px monospace';
+  ctx.textAlign = 'right';
+  for (let i = 0; i < visibleBP; i++) {
+    const snp = snps.length ? snps[i % snps.length] : null;
+    const b1  = snp ? (snp.genotype[0] || 'A') : ['A','G','T','C','G','A','C','T','G','A'][i%10];
+    const b2  = complement[b1] || 'T';
+    const yy  = 22 + i * 18;
+
+    ctx.fillStyle = withAlpha(baseColor(b1), 0.9);
+    ctx.fillText(b1, w - 30, yy);
+    ctx.fillStyle = '#1f3550';
+    ctx.fillText('·', w - 20, yy);
+    ctx.fillStyle = withAlpha(baseColor(b2), 0.9);
+    ctx.fillText(b2, w - 10, yy);
+  }
 }
 
 function drawNode(ctx, x, y, r, color, alpha, glow = false) {
   if (glow) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.5);
-    g.addColorStop(0, withAlpha(color, alpha * 0.8));
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.8);
+    g.addColorStop(0, withAlpha(color, alpha * 0.7));
     g.addColorStop(1, withAlpha(color, 0));
     ctx.beginPath();
-    ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
+    ctx.arc(x, y, r * 2.8, 0, Math.PI * 2);
     ctx.fillStyle = g;
     ctx.fill();
   }
+  // Sphere shading: highlight at top-left
+  const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+  grad.addColorStop(0, withAlpha('#ffffff', alpha * 0.55));
+  grad.addColorStop(0.4, withAlpha(color, alpha));
+  grad.addColorStop(1,   withAlpha(color, alpha * 0.6));
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = withAlpha(color, alpha);
+  ctx.fillStyle = grad;
   ctx.fill();
 }
 
