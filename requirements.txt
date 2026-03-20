@@ -2,3 +2,10 @@ anthropic
 biopython
 pandas
 numpy
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+psutil
+redis
+pymongo

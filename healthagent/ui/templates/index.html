@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HealthAgent · DNA Visualiser</title>
+<style>
+  /* ── Reset & base ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #0a0e1a;
+    --panel:   #111827;
+    --border:  #1f2d45;
+    --accent:  #00d4ff;
+    --A:       #00cc44;   /* Adenine  – green  */
+    --T:       #ff3355;   /* Thymine  – red    */
+    --G:       #3399ff;   /* Guanine  – blue   */
+    --C:       #ffaa00;   /* Cytosine – amber  */
+    --text:    #c9d6e8;
+    --muted:   #4a5f7a;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ───────────────────────────────────────────────────── */
+  header {
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: var(--panel);
+  }
+  header h1 { font-size: 1.4rem; color: var(--accent); letter-spacing: .05em; }
+  .badge {
+    font-size: .75rem;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    background: #0d2035;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .upload-area {
+    margin-left: auto;
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+  }
+  .btn {
+    padding: .4rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: .85rem;
+    transition: background .15s;
+  }
+  .btn:hover { background: #0d2035; }
+  .btn.primary { background: var(--accent); color: #000; font-weight: 600; }
+  .btn.primary:hover { background: #00b8d9; }
+  #file-input { display: none; }
+  #status-bar {
+    font-size: .78rem;
+    color: var(--muted);
+    min-width: 14rem;
+    text-align: right;
+  }
+
+  /* ── Layout ───────────────────────────────────────────────────── */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+  }
+
+  /* ── Legend sidebar ───────────────────────────────────────────── */
+  aside {
+    grid-row: 1 / 3;
+    border-right: 1px solid var(--border);
+    padding: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    overflow-y: auto;
+  }
+  aside h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .legend { display: flex; flex-direction: column; gap: .4rem; }
+  .legend-item {
+    display: flex; align-items: center; gap: .6rem; font-size: .85rem;
+  }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-A { background: var(--A); box-shadow: 0 0 6px var(--A); }
+  .dot-T { background: var(--T); box-shadow: 0 0 6px var(--T); }
+  .dot-G { background: var(--G); box-shadow: 0 0 6px var(--G); }
+  .dot-C { background: var(--C); box-shadow: 0 0 6px var(--C); }
+  .dot-pair { background: #334; border: 1px solid #556; }
+
+  /* Chromosome filter */
+  #chrom-list {
+    display: flex; flex-wrap: wrap; gap: .3rem;
+  }
+  .chrom-btn {
+    padding: .2rem .55rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #0d1929;
+    color: var(--text);
+    cursor: pointer;
+    font-size: .75rem;
+    transition: all .15s;
+  }
+  .chrom-btn.active, .chrom-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #0d2035;
+  }
+
+  /* Stats */
+  .stats { display: flex; flex-direction: column; gap: .5rem; }
+  .stat { display: flex; justify-content: space-between; font-size: .82rem; }
+  .stat-val { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  /* Speed control */
+  .control-row { display: flex; align-items: center; gap: .6rem; font-size: .82rem; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+
+  /* ── Top canvas section – helix ───────────────────────────────── */
+  #helix-section {
+    border-bottom: 1px solid var(--border);
+    padding: .8rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    background: #0c1220;
+  }
+  #helix-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  #helix-canvas {
+    width: 100%;
+    height: 240px;
+    border-radius: 8px;
+    display: block;
+  }
+
+  /* ── Bottom strand viewer ─────────────────────────────────────── */
+  #strand-section {
+    padding: .8rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    overflow: hidden;
+  }
+  #strand-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  #strand-canvas {
+    width: 100%;
+    flex: 1;
+    border-radius: 8px;
+    display: block;
+    min-height: 200px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────── -->
+<header>
+  <h1>&#x1F9EC; HealthAgent</h1>
+  <span class="badge">DNA Visualiser</span>
+  <div class="upload-area">
+    <span id="status-bar">No profile loaded</span>
+    <button class="btn" onclick="loadDemo()">Load Demo</button>
+    <button class="btn primary" onclick="document.getElementById('file-input').click()">Upload DNA File</button>
+    <input type="file" id="file-input" accept=".txt,.csv,.tsv,.vcf" onchange="uploadFile(this)">
+  </div>
+</header>
+
+<!-- ── Main layout ────────────────────────────────────────────── -->
+<main>
+
+  <!-- Sidebar -->
+  <aside>
+    <div>
+      <h2>Base Legend</h2>
+      <div class="legend" style="margin-top:.6rem">
+        <div class="legend-item"><span class="dot dot-A"></span> A — Adenine</div>
+        <div class="legend-item"><span class="dot dot-T"></span> T — Thymine &nbsp;(A↔T)</div>
+        <div class="legend-item"><span class="dot dot-G"></span> G — Guanine</div>
+        <div class="legend-item"><span class="dot dot-C"></span> C — Cytosine (G↔C)</div>
+        <div class="legend-item"><span class="dot dot-pair"></span> Backbone</div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Profile Stats</h2>
+      <div class="stats" style="margin-top:.5rem">
+        <div class="stat"><span>Format</span><span class="stat-val" id="st-format">—</span></div>
+        <div class="stat"><span>SNPs loaded</span><span class="stat-val" id="st-snps">—</span></div>
+        <div class="stat"><span>Chromosomes</span><span class="stat-val" id="st-chroms">—</span></div>
+        <div class="stat"><span>Viewing</span><span class="stat-val" id="st-viewing">—</span></div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Chromosome Filter</h2>
+      <div id="chrom-list" style="margin-top:.5rem">
+        <span style="font-size:.78rem;color:var(--muted)">Upload a file to filter</span>
+      </div>
+    </div>
+
+    <div>
+      <h2>Helix Speed</h2>
+      <div class="control-row" style="margin-top:.4rem">
+        <span>Slow</span>
+        <input type="range" id="speed-slider" min="0.2" max="4" step="0.1" value="1">
+        <span>Fast</span>
+      </div>
+    </div>
+
+    <div>
+      <h2>Strand zoom</h2>
+      <div class="control-row" style="margin-top:.4rem">
+        <span>-</span>
+        <input type="range" id="zoom-slider" min="4" max="24" step="1" value="10">
+        <span>+</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Helix panel -->
+  <section id="helix-section">
+    <h2>Double Helix — AGTC Base-Pair Bindings</h2>
+    <canvas id="helix-canvas"></canvas>
+  </section>
+
+  <!-- Strand panel -->
+  <section id="strand-section">
+    <h2>Strand View — Colorised Nucleotide Sequence</h2>
+    <canvas id="strand-canvas"></canvas>
+  </section>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  Colour palette
+// ═══════════════════════════════════════════════════════════════════
+const COLORS = {
+  A: '#00cc44', T: '#ff3355', G: '#3399ff', C: '#ffaa00',
+  backbone1: '#1a3a5c', backbone2: '#1a3c5f',
+  rung: '#1f3550',
+  glow: 0.55,
+};
+
+const complement = { A:'T', T:'A', G:'C', C:'G' };
+
+function baseColor(b) { return COLORS[b] || '#556'; }
+
+// ═══════════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════════
+let snpData   = [];          // array of {rsid, chromosome, position, genotype}
+let angle     = 0;           // helix rotation angle
+let strandOff = 0;           // strand scroll offset
+let speed     = 1.0;
+let zoom      = 10;
+let raf       = null;
+let activeChrom = null;
+
+// ═══════════════════════════════════════════════════════════════════
+//  API helpers
+// ═══════════════════════════════════════════════════════════════════
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+  return r.json();
+}
+
+async function loadDemo() {
+  setStatus('Loading demo…');
+  try {
+    const d = await api('/api/demo');
+    await afterLoad(d);
+  } catch(e) { setStatus('Error: ' + e.message); }
+}
+
+async function uploadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  setStatus(`Uploading ${file.name}…`);
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const d = await api('/api/upload', { method: 'POST', body: fd });
+    await afterLoad(d);
+  } catch(e) { setStatus('Error: ' + e.message); }
+}
+
+async function afterLoad(info) {
+  setStatus(`${info.filename}  ·  ${info.format}  ·  ${info.snp_count.toLocaleString()} SNPs`);
+  document.getElementById('st-format').textContent  = info.format;
+  document.getElementById('st-snps').textContent    = info.snp_count.toLocaleString();
+
+  // Load chromosomes
+  const { chromosomes } = await api('/api/chromosomes');
+  document.getElementById('st-chroms').textContent = chromosomes.length;
+  buildChromFilter(chromosomes);
+
+  // Load first batch of SNPs
+  activeChrom = null;
+  await fetchSNPs();
+}
+
+async function fetchSNPs(chrom) {
+  const q = chrom ? `?chromosome=${chrom}&limit=500` : '?limit=500';
+  try {
+    const d = await api('/api/snps' + q);
+    snpData = d.snps;
+    document.getElementById('st-viewing').textContent =
+      snpData.length.toLocaleString() + (chrom ? ` (chr ${chrom})` : ' (all)');
+    strandOff = 0;
+  } catch(e) { setStatus('Error: ' + e.message); }
+}
+
+function setStatus(msg) {
+  document.getElementById('status-bar').textContent = msg;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Chromosome filter buttons
+// ═══════════════════════════════════════════════════════════════════
+function buildChromFilter(chroms) {
+  const el = document.getElementById('chrom-list');
+  el.innerHTML = '';
+  const all = document.createElement('button');
+  all.className = 'chrom-btn active';
+  all.textContent = 'ALL';
+  all.onclick = () => selectChrom(null, all);
+  el.appendChild(all);
+  chroms.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chrom-btn';
+    b.textContent = c;
+    b.onclick = () => selectChrom(c, b);
+    el.appendChild(b);
+  });
+}
+
+async function selectChrom(chrom, btn) {
+  document.querySelectorAll('.chrom-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeChrom = chrom;
+  await fetchSNPs(chrom);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Canvas sizing
+// ═══════════════════════════════════════════════════════════════════
+function resizeCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr  = window.devicePixelRatio || 1;
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { w: rect.width, h: rect.height };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DNA HELIX RENDERER
+// ═══════════════════════════════════════════════════════════════════
+function drawHelix(canvas, snps, theta) {
+  const ctx   = canvas.getContext('2d');
+  const { w, h } = resizeCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+
+  const cx      = w / 2;
+  const cy      = h / 2;
+  const rx      = Math.min(w * 0.18, 60);   // helix radius
+  const pitch   = 38;                        // vertical distance per full turn
+  const turns   = Math.ceil(h / pitch) + 2;
+  const steps   = turns * 36;               // points per strand
+
+  // ── 1. Compute 3D helix points projected to 2D ───────────────
+  // Strand A: angles [theta .. theta + 2π*turns]
+  // Strand B: offset by π
+  const strand1 = [];
+  const strand2 = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2 * turns + theta;
+    const y = (i / steps) * h - pitch;     // top to bottom
+    strand1.push({ x: cx + rx * Math.cos(t),      y, z: Math.sin(t) });
+    strand2.push({ x: cx + rx * Math.cos(t + Math.PI), y, z: Math.sin(t + Math.PI) });
+  }
+
+  // ── 2. Draw backbone tubes ───────────────────────────────────
+  function drawBackbone(pts, col) {
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const alpha = 0.5 + 0.5 * ((p.z + 1) / 2);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 3;
+    ctx.stroke();
+  }
+
+  // Draw back-layer elements first (z < 0), then front
+  drawBackbone(strand1.filter(p => p.z <= 0), '#152840');
+  drawBackbone(strand2.filter(p => p.z <= 0), '#152840');
+
+  // ── 3. Draw base-pair rungs ───────────────────────────────────
+  const rungStep = 12;   // every N points draw a rung
+  for (let i = 0; i < steps; i += rungStep) {
+    const p1 = strand1[i];
+    const p2 = strand2[i];
+    const avgZ = (p1.z + p2.z) / 2;
+
+    // Pick a base from snpData cycling through
+    const snp = snps.length ? snps[Math.floor(i / rungStep) % snps.length] : null;
+    const b1  = snp ? (snp.genotype[0] || 'A') : 'A';
+    const b2  = complement[b1] || 'T';
+
+    const alpha = 0.35 + 0.65 * ((avgZ + 1) / 2);   // depth fade
+
+    // midpoint
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+
+    // Half-rung strand1 → mid
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(mx, my);
+    ctx.strokeStyle = withAlpha(baseColor(b1), alpha);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Half-rung mid → strand2
+    ctx.beginPath();
+    ctx.moveTo(mx, my);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = withAlpha(baseColor(b2), alpha);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Nucleotide dots
+    drawNode(ctx, p1.x, p1.y, 4, baseColor(b1), alpha);
+    drawNode(ctx, p2.x, p2.y, 4, baseColor(b2), alpha);
+  }
+
+  // Front backbones
+  drawBackbone(strand1.filter(p => p.z > 0), '#1a5080');
+  drawBackbone(strand2.filter(p => p.z > 0), '#1a4070');
+
+  // ── 4. Front nucleotide nodes (over backbone) ────────────────
+  for (let i = 0; i < steps; i += rungStep) {
+    const p1  = strand1[i];
+    const p2  = strand2[i];
+    const snp = snps.length ? snps[Math.floor(i / rungStep) % snps.length] : null;
+    const b1  = snp ? (snp.genotype[0] || 'A') : 'A';
+    const b2  = complement[b1] || 'T';
+    if (p1.z > 0) drawNode(ctx, p1.x, p1.y, 5, baseColor(b1), 1.0, true);
+    if (p2.z > 0) drawNode(ctx, p2.x, p2.y, 5, baseColor(b2), 1.0, true);
+  }
+
+  // ── 5. AGTC label strip on the right ─────────────────────────
+  const labelSnps = snps.slice(0, Math.floor(h / 22));
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'left';
+  labelSnps.forEach((s, idx) => {
+    const yy = 18 + idx * 22;
+    const b1 = s.genotype[0] || '?';
+    const b2 = s.genotype[1] || '?';
+    ctx.fillStyle = withAlpha(baseColor(b1), 0.9);
+    ctx.fillText(b1, w - 52, yy);
+    ctx.fillStyle = '#334';
+    ctx.fillText('—', w - 42, yy);
+    ctx.fillStyle = withAlpha(baseColor(b2), 0.9);
+    ctx.fillText(b2, w - 28, yy);
+  });
+}
+
+function drawNode(ctx, x, y, r, color, alpha, glow = false) {
+  if (glow) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.5);
+    g.addColorStop(0, withAlpha(color, alpha * 0.8));
+    g.addColorStop(1, withAlpha(color, 0));
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = withAlpha(color, alpha);
+  ctx.fill();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  STRAND VIEWER RENDERER
+// ═══════════════════════════════════════════════════════════════════
+function drawStrands(canvas, snps, offsetX, cellW) {
+  const ctx = canvas.getContext('2d');
+  const { w, h } = resizeCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+
+  if (!snps.length) {
+    ctx.fillStyle = '#334';
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Load a DNA file or click "Load Demo" to begin', w / 2, h / 2);
+    return;
+  }
+
+  const rowH   = cellW + 6;
+  const rows   = Math.max(1, Math.floor(h / (rowH * 2 + 14)));
+  const cols   = Math.ceil(w / cellW) + 2;
+  const start  = Math.max(0, Math.floor(offsetX / cellW));
+
+  // Label area
+  const labelW = 56;
+  ctx.font = `${Math.max(8, cellW - 2)}px monospace`;
+  ctx.textAlign = 'center';
+
+  // Row labels
+  ['5′ → 3′', '3′ → 5′'].forEach((lbl, ri) => {
+    const yBase = 24 + ri * (rowH * 2 + 14);
+    ctx.fillStyle = '#4a5f7a';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText(lbl, 4, yBase + rowH - 4);
+    ctx.textAlign = 'center';
+    ctx.font = `${Math.max(8, cellW - 2)}px monospace`;
+  });
+
+  for (let col = 0; col < cols; col++) {
+    const si = (start + col) % snps.length;
+    const snp = snps[si];
+    if (!snp) continue;
+
+    const b1 = snp.genotype[0] || 'N';
+    const b2 = snp.genotype[1] || complement[b1] || 'N';
+    const x  = labelW + col * cellW - (offsetX % cellW);
+
+    if (x + cellW < 0 || x > w) continue;
+
+    // ── Strand 1 (sense)
+    const y1 = 10;
+    const cy1 = y1 + rowH / 2;
+
+    drawStrandCell(ctx, x, y1, cellW, rowH, b1);
+
+    // ── Backbone line between strands
+    const gap = 6;
+    ctx.strokeStyle = '#1f3550';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(x + cellW / 2, y1 + rowH + 1);
+    ctx.lineTo(x + cellW / 2, y1 + rowH + gap - 1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── Strand 2 (antisense – complement)
+    const y2 = y1 + rowH + gap;
+    drawStrandCell(ctx, x, y2, cellW, rowH, complement[b1] || b2);
+
+    // rsid tooltip at bottom
+    if (cellW >= 14) {
+      ctx.fillStyle = '#2a4060';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      const label = snp.rsid.length > 10 ? snp.rsid.slice(0, 9) + '…' : snp.rsid;
+      ctx.fillText(label, x + cellW / 2, y2 + rowH + 12);
+      ctx.font = `${Math.max(8, cellW - 2)}px monospace`;
+    }
+  }
+
+  // Scroll indicator
+  const barW = Math.max(40, (w / snps.length) * cols);
+  const barX = (offsetX / (snps.length * cellW)) * w;
+  ctx.fillStyle = '#1a3050';
+  ctx.fillRect(0, h - 4, w, 4);
+  ctx.fillStyle = '#00d4ff44';
+  ctx.fillRect(barX, h - 4, barW, 4);
+}
+
+function drawStrandCell(ctx, x, y, cw, ch, base) {
+  const color = baseColor(base);
+
+  // Background pill
+  const r = 4;
+  ctx.beginPath();
+  ctx.roundRect(x + 1, y + 1, cw - 2, ch - 2, r);
+  const grad = ctx.createLinearGradient(x, y, x, y + ch);
+  grad.addColorStop(0, withAlpha(color, 0.25));
+  grad.addColorStop(1, withAlpha(color, 0.08));
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = withAlpha(color, 0.5);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Letter
+  ctx.fillStyle = color;
+  ctx.font = `bold ${Math.min(cw - 4, 14)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText(base, x + cw / 2, y + ch - 4);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Animation loop
+// ═══════════════════════════════════════════════════════════════════
+const helixCanvas  = document.getElementById('helix-canvas');
+const strandCanvas = document.getElementById('strand-canvas');
+
+let lastTime = null;
+
+function loop(ts) {
+  if (lastTime === null) lastTime = ts;
+  const dt = (ts - lastTime) / 1000;
+  lastTime = ts;
+
+  angle     = (angle + dt * speed * 0.6) % (Math.PI * 2);
+  strandOff = (strandOff + dt * speed * zoom * 4) % Math.max(1, snpData.length * zoom);
+
+  drawHelix(helixCanvas,  snpData, angle);
+  drawStrands(strandCanvas, snpData, strandOff, zoom);
+
+  raf = requestAnimationFrame(loop);
+}
+
+// Controls
+document.getElementById('speed-slider').addEventListener('input', e => {
+  speed = parseFloat(e.target.value);
+});
+document.getElementById('zoom-slider').addEventListener('input', e => {
+  zoom = parseInt(e.target.value, 10);
+});
+
+// Start loop
+window.addEventListener('load', () => {
+  requestAnimationFrame(loop);
+  // Also draw placeholder immediately
+  drawStrands(strandCanvas, [], 0, zoom);
+});
+
+window.addEventListener('resize', () => {
+  // canvases are resized inside each draw call
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  Utility
+// ═══════════════════════════════════════════════════════════════════
+function withAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+}
+</script>
+</body>
+</html>
