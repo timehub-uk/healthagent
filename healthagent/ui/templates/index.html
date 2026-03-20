@@ -153,22 +153,73 @@
     display: block;
   }
 
-  /* ── Bottom strand viewer ─────────────────────────────────────── */
-  #strand-section {
+  /* ── Bottom tabbed panel ──────────────────────────────────────── */
+  #bottom-section {
     padding: .8rem 1rem;
     display: flex;
     flex-direction: column;
     gap: .6rem;
     overflow: hidden;
   }
-  #strand-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  #strand-canvas {
+  .tab-bar {
+    display: flex;
+    gap: .3rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: .4rem;
+  }
+  .tab-btn {
+    padding: .3rem .85rem;
+    border-radius: 5px 5px 0 0;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: .78rem;
+    transition: all .15s;
+  }
+  .tab-btn.active {
+    border-color: var(--border);
+    border-bottom-color: var(--bg);
+    background: var(--panel);
+    color: var(--accent);
+  }
+  .tab-pane { display: none; flex: 1; }
+  .tab-pane.active { display: flex; flex-direction: column; }
+  #strand-canvas, #gel-canvas {
     width: 100%;
     flex: 1;
     border-radius: 8px;
     display: block;
     min-height: 200px;
   }
+  /* Staining mode buttons */
+  .stain-bar {
+    display: flex;
+    gap: .4rem;
+    align-items: center;
+    font-size: .78rem;
+    color: var(--muted);
+  }
+  .stain-btn {
+    padding: .2rem .7rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #0d1929;
+    color: var(--text);
+    cursor: pointer;
+    font-size: .75rem;
+    transition: all .15s;
+  }
+  .stain-btn:hover { border-color: var(--accent); }
+  .stain-btn.active { border-color: currentColor; font-weight: 600; }
+  .stain-btn.s-natural { color: #00cc44; }
+  .stain-btn.s-natural.active { background: #001a08; }
+  .stain-btn.s-dapi    { color: #7b6fff; }
+  .stain-btn.s-dapi.active    { background: #0e0a2a; }
+  .stain-btn.s-sybr    { color: #aaff44; }
+  .stain-btn.s-sybr.active    { background: #0a1a00; }
+  .stain-btn.s-etbr    { color: #ff8800; }
+  .stain-btn.s-etbr.active    { background: #1a0a00; }
 </style>
 </head>
 <body>
@@ -246,36 +297,122 @@
         <span>+</span>
       </div>
     </div>
+
+    <div>
+      <h2>Staining Modes</h2>
+      <div class="legend" style="margin-top:.5rem;font-size:.78rem;gap:.45rem">
+        <div class="legend-item"><span class="dot" style="background:#00cc44;box-shadow:0 0 5px #00cc44"></span> Natural — AGTC colours</div>
+        <div class="legend-item"><span class="dot" style="background:#7b6fff;box-shadow:0 0 8px #7b6fff"></span> DAPI — UV blue-violet fluorescence</div>
+        <div class="legend-item"><span class="dot" style="background:#aaff44;box-shadow:0 0 8px #aaff44"></span> SYBR Green — intercalating dye</div>
+        <div class="legend-item"><span class="dot" style="background:#ff8800;box-shadow:0 0 8px #ff8800"></span> EtBr/UV — ethidium bromide under UV</div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Gel View</h2>
+      <div class="legend" style="margin-top:.5rem;font-size:.78rem;gap:.4rem;color:var(--muted)">
+        <div>Each lane = one chromosome</div>
+        <div>Band position ∝ SNP density</div>
+        <div>Band brightness = fragment count</div>
+        <div>Stain colour follows mode above</div>
+      </div>
+    </div>
   </aside>
 
   <!-- Helix panel -->
   <section id="helix-section">
-    <h2>Double Helix — AGTC Base-Pair Bindings</h2>
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <h2 style="flex:1">Double Helix — AGTC Base-Pair Bindings</h2>
+      <div class="stain-bar">
+        <span>Stain:</span>
+        <button class="stain-btn s-natural active" onclick="setStain('natural',this)">Natural</button>
+        <button class="stain-btn s-dapi"    onclick="setStain('dapi',this)">DAPI</button>
+        <button class="stain-btn s-sybr"    onclick="setStain('sybr',this)">SYBR Green</button>
+        <button class="stain-btn s-etbr"    onclick="setStain('etbr',this)">EtBr/UV</button>
+      </div>
+    </div>
     <canvas id="helix-canvas"></canvas>
   </section>
 
-  <!-- Strand panel -->
-  <section id="strand-section">
-    <h2>Strand View — Colorised Nucleotide Sequence</h2>
-    <canvas id="strand-canvas"></canvas>
+  <!-- Bottom tabbed panel -->
+  <section id="bottom-section">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('strand',this)">Strand View</button>
+      <button class="tab-btn"        onclick="switchTab('gel',this)">Gel Electrophoresis</button>
+    </div>
+    <div id="tab-strand" class="tab-pane active">
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Colorised sense / antisense nucleotide sequence</p>
+      <canvas id="strand-canvas"></canvas>
+    </div>
+    <div id="tab-gel" class="tab-pane">
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Agarose gel simulation — SNP density per chromosome under UV staining</p>
+      <canvas id="gel-canvas"></canvas>
+    </div>
   </section>
 
 </main>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-//  Colour palette
+//  Colour palettes — natural + fluorescent staining modes
+//
+//  DAPI:       binds minor groove of AT-rich regions → blue-violet glow
+//  SYBR Green: intercalates all dsDNA → uniform bright green
+//  EtBr/UV:    intercalates → orange-red emission under 302 nm UV
 // ═══════════════════════════════════════════════════════════════════
-const COLORS = {
-  A: '#00cc44', T: '#ff3355', G: '#3399ff', C: '#ffaa00',
-  backbone1: '#1a3a5c', backbone2: '#1a3c5f',
-  rung: '#1f3550',
-  glow: 0.55,
+const STAINS = {
+  natural: {
+    A: '#00cc44', T: '#ff3355', G: '#3399ff', C: '#ffaa00',
+    strand1: '#2a7ab8', strand2: '#c44870',
+    bg: '#0c1220', hbond: '#aaccff', groove: true,
+  },
+  dapi: {
+    // DAPI preferentially binds AT-rich regions — brighter on A/T
+    A: '#a090ff', T: '#c0b0ff', G: '#5040cc', C: '#6050dd',
+    strand1: '#8070ee', strand2: '#9080ff',
+    bg: '#04020f', hbond: '#c8c0ff', groove: false,
+    glowCol: '#7060dd', glowScale: 3.5,
+  },
+  sybr: {
+    // SYBR Green — all bases same bright green intercalation signal
+    A: '#aaff44', T: '#88ee22', G: '#ccff66', C: '#99ee33',
+    strand1: '#66dd00', strand2: '#44bb00',
+    bg: '#020a00', hbond: '#ccffaa', groove: false,
+    glowCol: '#88ff33', glowScale: 4,
+  },
+  etbr: {
+    // Ethidium bromide under UV — orange-red emission
+    A: '#ff9900', T: '#ff6600', G: '#ffbb44', C: '#ff7722',
+    strand1: '#dd6600', strand2: '#cc5500',
+    bg: '#0f0500', hbond: '#ffddaa', groove: false,
+    glowCol: '#ff8800', glowScale: 3.8,
+  },
 };
+
+let stainMode = 'natural';
+let currentStain = STAINS.natural;
+let activeTab = 'strand';
+
+function setStain(mode, btn) {
+  stainMode = mode;
+  currentStain = STAINS[mode];
+  document.querySelectorAll('.stain-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Update helix section background to match stain
+  document.getElementById('helix-section').style.background = currentStain.bg;
+}
+
+function switchTab(tab, btn) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
 
 const complement = { A:'T', T:'A', G:'C', C:'G' };
 
-function baseColor(b) { return COLORS[b] || '#556'; }
+function baseColor(b) { return currentStain[b] || '#556'; }
 
 // ═══════════════════════════════════════════════════════════════════
 //  State
@@ -475,8 +612,9 @@ function drawHelix(canvas, snps, theta) {
     ctx.stroke();
   }
 
-  drawRibbon(s1, '#2a7ab8', '#0e2a42', 5);
-  drawRibbon(s2, '#c44870', '#3a0e1e', 5);
+  const st = currentStain;
+  drawRibbon(s1, st.strand1, withAlpha(st.strand1, 0.25), 5);
+  drawRibbon(s2, st.strand2, withAlpha(st.strand2, 0.25), 5);
 
   // ── 3. Base-pair rungs (one per BP) ───────────────────────────
   // Collect all rungs with their z-depth, sort back-to-front
@@ -536,13 +674,28 @@ function drawHelix(canvas, snps, theta) {
     // A–T: 2 H-bonds  |  G–C: 3 H-bonds
     const hBonds = (b1 === 'G' || b1 === 'C') ? 3 : 2;
     const hAlpha = Math.min(1, alpha * 1.4);
+    const hbondCol = currentStain.hbond || '#aaccff';
     for (let d = 0; d < hBonds; d++) {
       const t   = (d + 1) / (hBonds + 1);
       const hx  = p1.x + (p2.x - p1.x) * t;
       const hy  = p1.y + (p2.y - p1.y) * t;
       ctx.beginPath();
       ctx.arc(hx, hy, depth > 0.5 ? 2 : 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = withAlpha('#aaccff', hAlpha * 0.7);
+      ctx.fillStyle = withAlpha(hbondCol, hAlpha * 0.7);
+      ctx.fill();
+    }
+
+    // Fluorescent background bloom for non-natural stains
+    if (stainMode !== 'natural' && depth > 0.3) {
+      const glowCol   = currentStain.glowCol || baseColor(b1);
+      const glowScale = currentStain.glowScale || 3;
+      const bloomR    = (isPurine1 ? 5.5 : 4.2) * glowScale;
+      const bloom     = ctx.createRadialGradient(mx, my, 0, mx, my, bloomR);
+      bloom.addColorStop(0, withAlpha(glowCol, alpha * 0.45));
+      bloom.addColorStop(1, withAlpha(glowCol, 0));
+      ctx.beginPath();
+      ctx.arc(mx, my, bloomR, 0, Math.PI * 2);
+      ctx.fillStyle = bloom;
       ctx.fill();
     }
 
@@ -554,36 +707,27 @@ function drawHelix(canvas, snps, theta) {
   });
 
   // ── 4. Direction arrows (anti-parallel labels) ────────────────
-  // 5′→3′ on strand 1 top,  3′→5′ on strand 2 top
   ctx.font      = 'bold 10px monospace';
   ctx.textAlign = 'center';
   const arrowY  = 14;
-
-  // Strand 1 label (blue side)
-  ctx.fillStyle = '#2a7ab8';
+  ctx.fillStyle = currentStain.strand1;
   ctx.fillText("5′ → 3′", s1[0].x, arrowY);
-
-  // Strand 2 label (red side) — anti-parallel so shows 3′ → 5′
-  ctx.fillStyle = '#c44870';
+  ctx.fillStyle = currentStain.strand2;
   ctx.fillText("3′ → 5′", s2[0].x, arrowY);
 
-  // ── 5. Groove annotations ────────────────────────────────────
-  // Label one major and one minor groove per visible turn
-  ctx.font      = '9px system-ui';
-  ctx.textAlign = 'left';
-  const grooveX = cx + rx + 8;
-
-  for (let turn = 0; turn < Math.floor(turns); turn++) {
-    // Major groove centre ≈ 30% into each turn
-    const majorFrac = (turn + 0.3) / turns;
-    const majorY    = majorFrac * h;
-    const minorFrac = (turn + 0.8) / turns;
-    const minorY    = minorFrac * h;
-
-    ctx.fillStyle = withAlpha('#4a8fbf', 0.55);
-    ctx.fillText('major', grooveX, majorY);
-    ctx.fillStyle = withAlpha('#bf4a6a', 0.45);
-    ctx.fillText('minor', grooveX, minorY);
+  // ── 5. Groove annotations (natural mode only — dyes mask grooves) ──
+  if (currentStain.groove !== false) {
+    ctx.font      = '9px system-ui';
+    ctx.textAlign = 'left';
+    const grooveX = cx + rx + 8;
+    for (let turn = 0; turn < Math.floor(turns); turn++) {
+      const majorY = ((turn + 0.3) / turns) * h;
+      const minorY = ((turn + 0.8) / turns) * h;
+      ctx.fillStyle = withAlpha('#4a8fbf', 0.55);
+      ctx.fillText('major', grooveX, majorY);
+      ctx.fillStyle = withAlpha('#bf4a6a', 0.45);
+      ctx.fillText('minor', grooveX, minorY);
+    }
   }
 
   // ── 6. Base-pair sequence strip (right edge) ─────────────────
@@ -739,10 +883,141 @@ function drawStrandCell(ctx, x, y, cw, ch, base) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  GEL ELECTROPHORESIS RENDERER
+//
+//  Simulates an agarose gel stained with the active fluorescent dye:
+//  • Each chromosome = one lane
+//  • Band y-position  = inverse of SNP density (more SNPs → shorter
+//    effective migration, higher band like a large fragment)
+//  • Band brightness  = relative SNP count (more = brighter/thicker)
+//  • Colour follows the active stain mode
+//  • Faint horizontal ladder marks on the left (size reference)
+// ═══════════════════════════════════════════════════════════════════
+function drawGel(canvas, snps) {
+  const ctx = canvas.getContext('2d');
+  const { w, h } = resizeCanvas(canvas);
+
+  // Gel background — very dark, near-black
+  const bgCol = stainMode === 'natural' ? '#05080f' : currentStain.bg;
+  ctx.fillStyle = bgCol;
+  ctx.fillRect(0, 0, w, h);
+
+  // Group SNPs by chromosome
+  const chromMap = {};
+  snps.forEach(s => {
+    chromMap[s.chromosome] = (chromMap[s.chromosome] || 0) + 1;
+  });
+
+  const chroms = Object.keys(chromMap).sort((a, b) => {
+    const n = x => isNaN(+x) ? 100 + x.charCodeAt(0) : +x;
+    return n(a) - n(b);
+  });
+
+  if (!chroms.length) {
+    ctx.fillStyle = '#334';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Load a DNA file to see the gel view', w / 2, h / 2);
+    return;
+  }
+
+  const maxCount  = Math.max(...Object.values(chromMap));
+  const laneW     = Math.min(48, (w - 60) / chroms.length);
+  const startX    = 50;
+  const wellY     = 28;
+  const runH      = h - wellY - 20;
+  const glowCol   = currentStain.glowCol  || (stainMode === 'natural' ? '#44aaff' : '#aaffaa');
+  const bandBase  = currentStain.A        || '#44aaff';
+
+  // ── Ladder (size reference marks on left) ────────────────────
+  ctx.strokeStyle = withAlpha('#446688', 0.5);
+  ctx.lineWidth   = 0.5;
+  ctx.setLineDash([3, 4]);
+  ctx.font        = '8px monospace';
+  ctx.fillStyle   = '#446688';
+  ctx.textAlign   = 'right';
+  const ladderSteps = 8;
+  for (let i = 1; i <= ladderSteps; i++) {
+    const ly = wellY + (i / ladderSteps) * runH;
+    ctx.beginPath();
+    ctx.moveTo(8, ly);
+    ctx.lineTo(startX - 4, ly);
+    ctx.stroke();
+    ctx.fillText(`${Math.round(10000 / i)} bp`, startX - 6, ly + 3);
+  }
+  ctx.setLineDash([]);
+
+  // ── Well strip ────────────────────────────────────────────────
+  ctx.fillStyle = withAlpha('#001830', 0.8);
+  ctx.fillRect(startX, 0, chroms.length * laneW, wellY - 2);
+
+  chroms.forEach((chrom, idx) => {
+    const count   = chromMap[chrom];
+    const relDens = count / maxCount;              // 0–1
+    // Higher density → band sits higher (like a larger fragment migrating less)
+    const bandY   = wellY + runH * (0.1 + 0.7 * (1 - relDens));
+    const bandH   = 5 + relDens * 12;             // thicker = more fragments
+    const lx      = startX + idx * laneW + laneW / 2;
+
+    // Lane separator
+    ctx.strokeStyle = withAlpha('#112233', 0.6);
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(startX + idx * laneW, wellY);
+    ctx.lineTo(startX + idx * laneW, h - 10);
+    ctx.stroke();
+
+    // Well rectangle
+    const wellW = laneW * 0.55;
+    ctx.fillStyle = '#001020';
+    ctx.fillRect(lx - wellW / 2, 4, wellW, wellY - 8);
+
+    // Outer glow bloom
+    const bloom = ctx.createRadialGradient(lx, bandY, 0, lx, bandY, laneW * 1.2);
+    bloom.addColorStop(0, withAlpha(glowCol, 0.5 * relDens));
+    bloom.addColorStop(1, withAlpha(glowCol, 0));
+    ctx.beginPath();
+    ctx.ellipse(lx, bandY, laneW * 1.2, bandH * 3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = bloom;
+    ctx.fill();
+
+    // Band core
+    const bandGrad = ctx.createLinearGradient(lx, bandY - bandH, lx, bandY + bandH);
+    bandGrad.addColorStop(0,   withAlpha(bandBase, 0.1));
+    bandGrad.addColorStop(0.5, withAlpha(bandBase, 0.9 * relDens + 0.3));
+    bandGrad.addColorStop(1,   withAlpha(bandBase, 0.1));
+    ctx.beginPath();
+    ctx.ellipse(lx, bandY, laneW * 0.4, bandH, 0, 0, Math.PI * 2);
+    ctx.fillStyle = bandGrad;
+    ctx.fill();
+
+    // Chromosome label at well top
+    ctx.fillStyle = withAlpha('#7aaabb', 0.85);
+    ctx.font      = laneW > 30 ? '9px monospace' : '7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(chrom, lx, wellY - 3);
+
+    // SNP count below band
+    if (laneW > 22) {
+      ctx.fillStyle = withAlpha(bandBase, 0.5);
+      ctx.font      = '7px monospace';
+      ctx.fillText(count, lx, bandY + bandH + 10);
+    }
+  });
+
+  // ── Title ────────────────────────────────────────────────────
+  ctx.fillStyle   = withAlpha('#446688', 0.7);
+  ctx.font        = '9px system-ui';
+  ctx.textAlign   = 'left';
+  ctx.fillText(`Agarose gel · ${stainMode.toUpperCase()} stain · ${snps.length.toLocaleString()} SNPs`, 8, h - 6);
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  Animation loop
 // ═══════════════════════════════════════════════════════════════════
 const helixCanvas  = document.getElementById('helix-canvas');
 const strandCanvas = document.getElementById('strand-canvas');
+const gelCanvas    = document.getElementById('gel-canvas');
 
 let lastTime = null;
 
@@ -754,8 +1029,13 @@ function loop(ts) {
   angle     = (angle + dt * speed * 0.6) % (Math.PI * 2);
   strandOff = (strandOff + dt * speed * zoom * 4) % Math.max(1, snpData.length * zoom);
 
-  drawHelix(helixCanvas,  snpData, angle);
-  drawStrands(strandCanvas, snpData, strandOff, zoom);
+  drawHelix(helixCanvas, snpData, angle);
+
+  if (activeTab === 'strand') {
+    drawStrands(strandCanvas, snpData, strandOff, zoom);
+  } else {
+    drawGel(gelCanvas, snpData);
+  }
 
   raf = requestAnimationFrame(loop);
 }
@@ -771,7 +1051,6 @@ document.getElementById('zoom-slider').addEventListener('input', e => {
 // Start loop
 window.addEventListener('load', () => {
   requestAnimationFrame(loop);
-  // Also draw placeholder immediately
   drawStrands(strandCanvas, [], 0, zoom);
 });
 
