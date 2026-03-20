@@ -702,6 +702,10 @@ function drawHelix(canvas, snps, theta) {
       ctx.fill();
     }
 
+    // Nucleotide nodes — purines (A,G) slightly larger than pyrimidines (T,C)
+    // Declared here (before the bloom block) so it's available when referenced below.
+    const isPurine1 = (b1 === 'A' || b1 === 'G');
+
     // Fluorescent background bloom for non-natural stains
     if (stainMode !== 'natural' && depth > 0.3) {
       const glowCol   = currentStain.glowCol || baseColor(b1);
@@ -715,9 +719,6 @@ function drawHelix(canvas, snps, theta) {
       ctx.fillStyle = bloom;
       ctx.fill();
     }
-
-    // Nucleotide nodes — purines (A,G) slightly larger than pyrimidines (T,C)
-    const isPurine1 = (b1 === 'A' || b1 === 'G');
     const isPurine2 = (b2 === 'A' || b2 === 'G');
     drawNode(ctx, p1.x, p1.y, isPurine1 ? 5.5 : 4.2, c1, alpha, depth > 0.55);
     drawNode(ctx, p2.x, p2.y, isPurine2 ? 5.5 : 4.2, c2, alpha, depth > 0.55);
