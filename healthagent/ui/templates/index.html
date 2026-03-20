@@ -3,373 +3,1854 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HealthAgent · DNA Visualiser</title>
+<title>HealthAgent · Your Wellness Story</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* ── Reset & base ─────────────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg:      #0a0e1a;
-    --panel:   #111827;
-    --border:  #1f2d45;
-    --accent:  #00d4ff;
-    --A:       #00cc44;   /* Adenine  – green  */
-    --T:       #ff3355;   /* Thymine  – red    */
-    --G:       #3399ff;   /* Guanine  – blue   */
-    --C:       #ffaa00;   /* Cytosine – amber  */
-    --text:    #c9d6e8;
-    --muted:   #4a5f7a;
-  }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+/* ── Reset & base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #0d1117;
+  --card:      #161b27;
+  --card-hover:#1c2336;
+  --border:    #232d42;
+  --accent1:   #6366f1;
+  --accent2:   #8b5cf6;
+  --accent-grad: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --muted2:    #94a3b8;
+  --amber:     #f59e0b;
+  --amber-bg:  #1c1400;
+  /* science canvas vars (keep existing) */
+  --sci-bg:    #0a0e1a;
+  --sci-panel: #111827;
+  --sci-border:#1f2d45;
+  --sci-accent:#00d4ff;
+  --A:         #00cc44;
+  --T:         #ff3355;
+  --G:         #3399ff;
+  --C:         #ffaa00;
+  --muted-sci: #4a5f7a;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+}
 
-  /* ── Header ───────────────────────────────────────────────────── */
-  header {
-    padding: 1rem 2rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    background: var(--panel);
-  }
-  header h1 { font-size: 1.4rem; color: var(--accent); letter-spacing: .05em; }
-  .badge {
-    font-size: .75rem;
-    padding: .2rem .6rem;
-    border-radius: 999px;
-    background: #0d2035;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-  }
-  .upload-area {
-    margin-left: auto;
-    display: flex;
-    gap: .75rem;
-    align-items: center;
-  }
-  .btn {
-    padding: .4rem 1rem;
-    border-radius: 6px;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-    cursor: pointer;
-    font-size: .85rem;
-    transition: background .15s;
-  }
-  .btn:hover { background: #0d2035; }
-  .btn.primary { background: var(--accent); color: #000; font-weight: 600; }
-  .btn.primary:hover { background: #00b8d9; }
-  #file-input { display: none; }
-  #status-bar {
-    font-size: .78rem;
-    color: var(--muted);
-    min-width: 14rem;
-    text-align: right;
-  }
+/* ── Scrollbar ────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  /* ── Layout ───────────────────────────────────────────────────── */
-  main {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 0;
-  }
+/* ══════════════════════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════════════════════ */
+#site-header {
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(13,17,23,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-logo {
+  font-size: 1.5rem;
+  line-height: 1;
+  text-decoration: none;
+}
+.header-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+.header-tagline {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.btn {
+  padding: 0.45rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.btn:hover {
+  border-color: var(--accent1);
+  color: var(--text);
+  background: rgba(99,102,241,0.08);
+}
+.btn-primary {
+  background: var(--accent-grad);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.45rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+#file-input { display: none; }
 
-  /* ── Legend sidebar ───────────────────────────────────────────── */
-  aside {
-    grid-row: 1 / 3;
-    border-right: 1px solid var(--border);
-    padding: 1.2rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.2rem;
-    overflow-y: auto;
-  }
-  aside h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  .legend { display: flex; flex-direction: column; gap: .4rem; }
-  .legend-item {
-    display: flex; align-items: center; gap: .6rem; font-size: .85rem;
-  }
-  .dot {
-    width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
-  }
-  .dot-A { background: var(--A); box-shadow: 0 0 6px var(--A); }
-  .dot-T { background: var(--T); box-shadow: 0 0 6px var(--T); }
-  .dot-G { background: var(--G); box-shadow: 0 0 6px var(--G); }
-  .dot-C { background: var(--C); box-shadow: 0 0 6px var(--C); }
-  .dot-pair { background: #334; border: 1px solid #556; }
+/* ══════════════════════════════════════════════════════════════
+   HERO
+══════════════════════════════════════════════════════════════ */
+#hero {
+  position: relative;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0d1117 0%, #111827 100%);
+  border-bottom: 1px solid var(--border);
+}
+#mini-helix {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.15;
+  pointer-events: none;
+}
+.hero-content {
+  position: relative;
+  z-index: 1;
+  padding: 2rem;
+}
+.hero-title {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+.hero-sub {
+  font-size: 0.95rem;
+  color: var(--muted2);
+  font-weight: 400;
+}
+.hero-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.25);
+  font-size: 0.85rem;
+  color: var(--accent2);
+  font-weight: 500;
+}
+.hero-count.hidden { display: none; }
 
-  /* Chromosome filter */
-  #chrom-list {
-    display: flex; flex-wrap: wrap; gap: .3rem;
-  }
-  .chrom-btn {
-    padding: .2rem .55rem;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: #0d1929;
-    color: var(--text);
-    cursor: pointer;
-    font-size: .75rem;
-    transition: all .15s;
-  }
-  .chrom-btn.active, .chrom-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: #0d2035;
-  }
+/* ══════════════════════════════════════════════════════════════
+   DEMO BANNER
+══════════════════════════════════════════════════════════════ */
+#demo-banner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.65rem 2rem;
+  background: rgba(245,158,11,0.08);
+  border-bottom: 1px solid rgba(245,158,11,0.2);
+  font-size: 0.85rem;
+  color: var(--amber);
+}
+#demo-banner.visible { display: flex; }
+.demo-banner-icon { font-size: 1rem; }
 
-  /* Stats */
-  .stats { display: flex; flex-direction: column; gap: .5rem; }
-  .stat { display: flex; justify-content: space-between; font-size: .82rem; }
-  .stat-val { color: var(--accent); font-variant-numeric: tabular-nums; }
+/* ══════════════════════════════════════════════════════════════
+   CATEGORY PILLS
+══════════════════════════════════════════════════════════════ */
+#category-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky;
+  top: 65px;
+  z-index: 90;
+}
+#category-bar::-webkit-scrollbar { display: none; }
+.cat-pill {
+  flex-shrink: 0;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted2);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.cat-pill:hover {
+  border-color: var(--accent1);
+  color: var(--text);
+}
+.cat-pill.active {
+  background: rgba(99,102,241,0.15);
+  border-color: var(--accent1);
+  color: #a5b4fc;
+  font-weight: 600;
+}
 
-  /* Speed control */
-  .control-row { display: flex; align-items: center; gap: .6rem; font-size: .82rem; }
-  input[type=range] { flex: 1; accent-color: var(--accent); }
+/* ══════════════════════════════════════════════════════════════
+   MAIN CONTENT AREA
+══════════════════════════════════════════════════════════════ */
+#main-content {
+  flex: 1;
+  padding: 1.5rem 2rem 3rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
 
-  /* ── Top canvas section – helix ───────────────────────────────── */
-  #helix-section {
-    border-bottom: 1px solid var(--border);
-    padding: .8rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: .5rem;
-    background: #0c1220;
-  }
-  #helix-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  #helix-canvas {
-    width: 100%;
-    height: 320px;
-    border-radius: 8px;
-    display: block;
-  }
+/* ══════════════════════════════════════════════════════════════
+   EMPTY STATE
+══════════════════════════════════════════════════════════════ */
+#empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+.empty-illustration {
+  margin-bottom: 2rem;
+  opacity: 0.7;
+}
+.empty-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+.empty-sub {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin-bottom: 2rem;
+  max-width: 420px;
+  line-height: 1.7;
+}
+.empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.empty-or {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
 
-  /* ── Bottom tabbed panel ──────────────────────────────────────── */
-  #bottom-section {
-    padding: .8rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: .6rem;
-    overflow: hidden;
-  }
-  .tab-bar {
-    display: flex;
-    gap: .3rem;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: .4rem;
-  }
-  .tab-btn {
-    padding: .3rem .85rem;
-    border-radius: 5px 5px 0 0;
-    border: 1px solid transparent;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: .78rem;
-    transition: all .15s;
-  }
-  .tab-btn.active {
-    border-color: var(--border);
-    border-bottom-color: var(--bg);
-    background: var(--panel);
-    color: var(--accent);
-  }
-  .tab-pane { display: none; flex: 1; }
-  .tab-pane.active { display: flex; flex-direction: column; }
-  #strand-canvas, #gel-canvas, #chroma-canvas {
-    width: 100%;
-    flex: 1;
-    border-radius: 8px;
-    display: block;
-    min-height: 200px;
-  }
-  /* Staining mode buttons */
-  .stain-bar {
-    display: flex;
-    gap: .4rem;
-    align-items: center;
-    font-size: .78rem;
-    color: var(--muted);
-  }
-  .stain-btn {
-    padding: .2rem .7rem;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: #0d1929;
-    color: var(--text);
-    cursor: pointer;
-    font-size: .75rem;
-    transition: all .15s;
-  }
-  .stain-btn:hover { border-color: var(--accent); }
-  .stain-btn.active { border-color: currentColor; font-weight: 600; }
-  .stain-btn.s-natural { color: #00cc44; }
-  .stain-btn.s-natural.active { background: #001a08; }
-  .stain-btn.s-dapi    { color: #7b6fff; }
-  .stain-btn.s-dapi.active    { background: #0e0a2a; }
-  .stain-btn.s-sybr    { color: #aaff44; }
-  .stain-btn.s-sybr.active    { background: #0a1a00; }
-  .stain-btn.s-etbr    { color: #ff8800; }
-  .stain-btn.s-etbr.active    { background: #1a0a00; }
+/* ══════════════════════════════════════════════════════════════
+   TRAIT CARD GRID
+══════════════════════════════════════════════════════════════ */
+#trait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+#trait-grid.hidden { display: none; }
+
+/* ── Individual trait card ─────────────────────────────────── */
+.trait-card {
+  background: var(--card);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  opacity: 0;
+  transform: translateY(16px);
+}
+.trait-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.4s ease, transform 0.4s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.trait-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  border-color: rgba(99,102,241,0.3);
+  background: var(--card-hover);
+}
+
+/* Colored left border by category */
+.trait-card-inner {
+  border-left: 4px solid var(--cat-color, #6366f1);
+  padding: 1.1rem 1.1rem 0 1.1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Card header row */
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.card-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  background: var(--cat-bg, rgba(99,102,241,0.12));
+}
+.card-title-group {
+  flex: 1;
+  min-width: 0;
+}
+.card-trait-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  margin-bottom: 0.2rem;
+}
+.card-category-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--cat-color, #6366f1);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Risk badge */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* Your result */
+.card-result {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.card-result-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 0.2rem;
+}
+
+/* Detail text */
+.card-detail {
+  font-size: 0.84rem;
+  color: var(--muted2);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-detail.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.expand-toggle {
+  font-size: 0.75rem;
+  color: var(--accent1);
+  cursor: pointer;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+  transition: color 0.15s;
+}
+.expand-toggle:hover { color: var(--accent2); }
+
+/* What you can do section */
+.card-action {
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.1);
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+}
+.card-action-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #a5b4fc;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.35rem;
+}
+.card-action-text {
+  font-size: 0.82rem;
+  color: var(--muted2);
+  line-height: 1.55;
+}
+
+/* Card footer */
+.card-footer {
+  padding: 0.6rem 1.1rem 0.6rem calc(1.1rem + 4px);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+}
+.card-gene {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background: rgba(255,255,255,0.04);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.card-rsid {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  margin-left: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DB STATUS BAR
+══════════════════════════════════════════════════════════════ */
+#db-status-bar {
+  padding: 0.55rem 2rem;
+  background: rgba(13,17,23,0.95);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.db-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  box-shadow: 0 0 5px #22c55e;
+}
+.db-status-dot.loading {
+  background: var(--amber);
+  box-shadow: 0 0 5px var(--amber);
+  animation: pulse 1.4s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EXPLORE THE SCIENCE SECTION
+══════════════════════════════════════════════════════════════ */
+/* ── Chromosome scanner ─────────────────────────────────────── */
+#chrom-scanner-section {
+  background: #f8f7ff;
+  border-top: 1px solid #e0e7ff;
+  border-bottom: 1px solid #e0e7ff;
+}
+#chrom-scanner-section summary {
+  padding: 1.1rem 2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6366f1;
+  letter-spacing: 0.02em;
+  list-style: none;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s;
+}
+#chrom-scanner-section summary::-webkit-details-marker { display: none; }
+#chrom-scanner-section[open] summary {
+  border-bottom-color: #e0e7ff;
+  background: rgba(99,102,241,0.04);
+}
+#chrom-scanner-section summary:hover { background: rgba(99,102,241,0.07); }
+#chrom-scanner-section[open] .science-chevron { transform: rotate(180deg); }
+#chrom-scanner-inner { padding: 1.25rem 2rem 1.5rem; }
+
+#chrom-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.55rem;
+}
+@media (max-width: 700px) { #chrom-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.chrom-block {
+  border-radius: 10px;
+  border: 2px solid #e0e7ff;
+  background: #fff;
+  padding: 0.6rem 0.5rem 0.55rem;
+  text-align: center;
+  position: relative;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+  overflow: hidden;
+  cursor: default;
+}
+.chrom-block.scanning {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  animation: chromPulse 0.9s ease-in-out infinite;
+}
+@keyframes chromPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
+  50%       { box-shadow: 0 0 0 5px rgba(99,102,241,0.08); }
+}
+.chrom-block.done-findings {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, #f5f3ff 0%, #fff 100%);
+}
+.chrom-block.done-drugs {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
+}
+.chrom-block.done-both {
+  border-color: #22c55e;
+  background: linear-gradient(135deg, #f0fdf4 0%, #fff 100%);
+}
+.chrom-block.done-none {
+  border-color: #e2e8f0;
+  background: #fafafa;
+}
+.chrom-block.pending {
+  opacity: 0.45;
+}
+.chrom-name {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #1e293b;
+  line-height: 1;
+  margin-bottom: 0.2rem;
+}
+.chrom-snp-count {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  margin-bottom: 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+.chrom-badges {
+  display: flex;
+  gap: 0.2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 1rem;
+}
+.chrom-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 10px;
+  letter-spacing: 0.03em;
+}
+.chrom-badge-w { background: #ede9fe; color: #6366f1; }
+.chrom-badge-d { background: #fef3c7; color: #b45309; }
+.chrom-scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #6366f1, transparent);
+  top: 0;
+  animation: scanLine 0.8s ease-in-out infinite;
+  display: none;
+}
+.chrom-block.scanning .chrom-scan-line { display: block; }
+@keyframes scanLine {
+  0%   { top: 0; opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ── Microbiome section ─────────────────────────────────────── */
+#microbiome-section {
+  background: #f0fdf4;
+  border-top: 1px solid #bbf7d0;
+  border-bottom: 1px solid #bbf7d0;
+  margin-bottom: 0;
+}
+#microbiome-section summary {
+  padding: 1.1rem 2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #16a34a;
+  letter-spacing: 0.02em;
+  list-style: none;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s;
+}
+#microbiome-section summary::-webkit-details-marker { display: none; }
+#microbiome-section[open] summary {
+  border-bottom-color: #bbf7d0;
+  background: rgba(34,197,94,0.05);
+}
+#microbiome-section summary:hover { background: rgba(34,197,94,0.08); }
+#microbiome-section[open] .science-chevron { transform: rotate(180deg); }
+#microbiome-inner {
+  padding: 1.5rem 2rem;
+}
+#microbiome-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  border: 2px dashed #86efac;
+  border-radius: 14px;
+  background: rgba(34,197,94,0.03);
+  margin-bottom: 1rem;
+}
+#microbiome-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+.mb-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  border-left: 4px solid #22c55e;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.mb-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.mb-card-icon { font-size: 1.4rem; }
+.mb-card-label { font-weight: 600; font-size: 0.9rem; color: #1e293b; }
+.mb-card-category {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 20px;
+  padding: 0.15rem 0.55rem;
+  margin-left: auto;
+}
+.mb-card-plain { font-size: 0.82rem; color: #475569; line-height: 1.45; }
+.mb-card-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.mb-card-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mb-card-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.mb-card-pct { font-size: 0.75rem; color: #64748b; min-width: 3rem; text-align: right; }
+.mb-signal-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  border-radius: 20px;
+}
+.mb-signal-high    { background: #dcfce7; color: #16a34a; }
+.mb-signal-normal  { background: #f0f9ff; color: #0369a1; }
+.mb-signal-low     { background: #fef3c7; color: #b45309; }
+.mb-signal-absent  { background: #f1f5f9; color: #94a3b8; }
+.mb-signal-elevated { background: #fee2e2; color: #b91c1c; }
+
+#science-section {
+  background: var(--sci-bg);
+  border-top: 1px solid var(--sci-border);
+}
+#science-section summary {
+  padding: 1.1rem 2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--sci-accent);
+  letter-spacing: 0.02em;
+  list-style: none;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s;
+}
+#science-section summary::-webkit-details-marker { display: none; }
+#science-section[open] summary {
+  border-bottom-color: var(--sci-border);
+  background: rgba(0,212,255,0.04);
+}
+#science-section summary:hover { background: rgba(0,212,255,0.06); }
+.science-chevron {
+  margin-left: auto;
+  font-size: 0.75rem;
+  transition: transform 0.25s;
+  color: var(--muted-sci);
+}
+#science-section[open] .science-chevron { transform: rotate(180deg); }
+
+/* Science inner layout */
+#science-inner {
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Re-declare all old science CSS inside science-inner ── */
+#science-inner {
+  --bg:      #0a0e1a;
+  --panel:   #111827;
+  --border:  #1f2d45;
+  --accent:  #00d4ff;
+  --text:    #c9d6e8;
+  --muted:   #4a5f7a;
+}
+#sci-header {
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #1f2d45;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: #111827;
+}
+#sci-header h1 { font-size: 1.1rem; color: #00d4ff; letter-spacing: .05em; }
+.sci-badge {
+  font-size: .75rem;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  background: #0d2035;
+  color: #00d4ff;
+  border: 1px solid #00d4ff;
+}
+.sci-status-bar {
+  font-size: .78rem;
+  color: #4a5f7a;
+  margin-left: auto;
+}
+#sci-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  min-height: 700px;
+}
+#sci-aside {
+  grid-row: 1 / 3;
+  border-right: 1px solid #1f2d45;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  overflow-y: auto;
+  background: #111827;
+}
+#sci-aside h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: #4a5f7a; }
+.sci-legend { display: flex; flex-direction: column; gap: .4rem; }
+.sci-legend-item { display: flex; align-items: center; gap: .6rem; font-size: .85rem; color: #c9d6e8; }
+.sci-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.sci-dot-A { background: #00cc44; box-shadow: 0 0 6px #00cc44; }
+.sci-dot-T { background: #ff3355; box-shadow: 0 0 6px #ff3355; }
+.sci-dot-G { background: #3399ff; box-shadow: 0 0 6px #3399ff; }
+.sci-dot-C { background: #ffaa00; box-shadow: 0 0 6px #ffaa00; }
+#sci-chrom-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+.sci-chrom-btn {
+  padding: .2rem .55rem;
+  border-radius: 4px;
+  border: 1px solid #1f2d45;
+  background: #0d1929;
+  color: #c9d6e8;
+  cursor: pointer;
+  font-size: .75rem;
+  font-family: inherit;
+  transition: all .15s;
+}
+.sci-chrom-btn.active, .sci-chrom-btn:hover {
+  border-color: #00d4ff;
+  color: #00d4ff;
+  background: #0d2035;
+}
+.sci-stats { display: flex; flex-direction: column; gap: .5rem; }
+.sci-stat { display: flex; justify-content: space-between; font-size: .82rem; color: #c9d6e8; }
+.sci-stat-val { color: #00d4ff; font-variant-numeric: tabular-nums; }
+.sci-control-row { display: flex; align-items: center; gap: .6rem; font-size: .82rem; color: #c9d6e8; }
+.sci-control-row input[type=range] { flex: 1; accent-color: #00d4ff; }
+#sci-helix-section {
+  border-bottom: 1px solid #1f2d45;
+  padding: .8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  background: #0c1220;
+}
+#sci-helix-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: #4a5f7a; }
+#helix-canvas {
+  width: 100%;
+  height: 320px;
+  border-radius: 8px;
+  display: block;
+}
+#sci-bottom-section {
+  padding: .8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  overflow: hidden;
+  background: #0a0e1a;
+}
+.sci-tab-bar {
+  display: flex;
+  gap: .3rem;
+  border-bottom: 1px solid #1f2d45;
+  padding-bottom: .4rem;
+}
+.sci-tab-btn {
+  padding: .3rem .85rem;
+  border-radius: 5px 5px 0 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4a5f7a;
+  cursor: pointer;
+  font-size: .78rem;
+  font-family: inherit;
+  transition: all .15s;
+}
+.sci-tab-btn.active {
+  border-color: #1f2d45;
+  border-bottom-color: #0a0e1a;
+  background: #111827;
+  color: #00d4ff;
+}
+.sci-tab-pane { display: none; flex: 1; flex-direction: column; }
+.sci-tab-pane.active { display: flex; }
+#strand-canvas, #gel-canvas, #chroma-canvas {
+  width: 100%;
+  flex: 1;
+  border-radius: 8px;
+  display: block;
+  min-height: 200px;
+}
+.sci-stain-bar {
+  display: flex;
+  gap: .4rem;
+  align-items: center;
+  font-size: .78rem;
+  color: #4a5f7a;
+}
+.sci-stain-btn {
+  padding: .2rem .7rem;
+  border-radius: 4px;
+  border: 1px solid #1f2d45;
+  background: #0d1929;
+  color: #c9d6e8;
+  cursor: pointer;
+  font-size: .75rem;
+  font-family: inherit;
+  transition: all .15s;
+}
+.sci-stain-btn:hover { border-color: #00d4ff; }
+.sci-stain-btn.active { border-color: currentColor; font-weight: 600; }
+.sci-stain-btn.s-natural { color: #00cc44; }
+.sci-stain-btn.s-natural.active { background: #001a08; }
+.sci-stain-btn.s-dapi    { color: #7b6fff; }
+.sci-stain-btn.s-dapi.active    { background: #0e0a2a; }
+.sci-stain-btn.s-sybr    { color: #aaff44; }
+.sci-stain-btn.s-sybr.active    { background: #0a1a00; }
+.sci-stain-btn.s-etbr    { color: #ff8800; }
+.sci-stain-btn.s-etbr.active    { background: #1a0a00; }
+
+/* ══════════════════════════════════════════════════════════════
+   LOADING SPINNER
+══════════════════════════════════════════════════════════════ */
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(13,17,23,0.75);
+  backdrop-filter: blur(6px);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+#loading-overlay.visible { display: flex; }
+
+/* ── Upload progress card ─────────────────────────────────────── */
+#upload-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 2rem 2.25rem;
+  min-width: 340px;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  animation: cardIn 0.25s ease;
+}
+@keyframes cardIn { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.uc-icon { font-size: 2.6rem; line-height: 1; }
+.uc-title { font-weight: 700; font-size: 1.05rem; color: #1e293b; text-align: center; }
+.uc-subtitle { font-size: 0.8rem; color: #64748b; text-align: center; line-height: 1.4; }
+.uc-lock {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: #16a34a;
+  font-weight: 600;
+  background: #dcfce7;
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+}
+.uc-bar-wrap {
+  width: 100%;
+  background: #e2e8f0;
+  border-radius: 6px;
+  height: 8px;
+  overflow: hidden;
+}
+.uc-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 0.3s ease;
+  width: 0%;
+}
+.uc-pct {
+  font-size: 0.82rem;
+  color: #6366f1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.uc-step { font-size: 0.78rem; color: #94a3b8; text-align: center; }
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 0.9rem; color: #e2e8f0; }
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  #site-header { padding: 0.75rem 1rem; }
+  .header-tagline { display: none; }
+  #main-content { padding: 1rem 1rem 2rem; }
+  #category-bar { padding: 0.75rem 1rem; top: 57px; }
+  #sci-main { grid-template-columns: 1fr; grid-template-rows: auto; }
+  #sci-aside { grid-row: auto; border-right: none; border-bottom: 1px solid #1f2d45; }
+}
 </style>
 </head>
 <body>
 
-<!-- ── Header ─────────────────────────────────────────────────── -->
-<header>
-  <h1>&#x1F9EC; HealthAgent</h1>
-  <span class="badge">DNA Visualiser</span>
-  <div class="upload-area">
-    <span id="status-bar">No profile loaded</span>
-    <button class="btn" onclick="loadDemo()">Load Demo</button>
-    <button class="btn primary" onclick="document.getElementById('file-input').click()">Upload DNA File</button>
+<!-- ══════════════════════════════════════════════════════════════
+     LOADING OVERLAY
+══════════════════════════════════════════════════════════════ -->
+<div id="loading-overlay">
+  <!-- Default spinner (non-upload tasks) -->
+  <div id="loading-default" style="display:flex;flex-direction:column;align-items:center;gap:1rem">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Loading your wellness story…</div>
+  </div>
+
+  <!-- Upload progress card (shown during chunked upload) -->
+  <div id="upload-card" style="display:none">
+    <div class="uc-icon">🧬</div>
+    <div class="uc-title" id="uc-title">Uploading your DNA file</div>
+    <div class="uc-lock">🔒 AES-256 encrypted in your browser</div>
+    <div class="uc-bar-wrap">
+      <div class="uc-bar-fill" id="uc-bar"></div>
+    </div>
+    <div class="uc-pct" id="uc-pct">0%</div>
+    <div class="uc-step" id="uc-step">Preparing…</div>
+    <div class="uc-subtitle">
+      Your file is split into chunks and encrypted before it leaves your device.<br>
+      Nothing is stored unencrypted on our server.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════════ -->
+<header id="site-header">
+  <span class="header-logo">🧬</span>
+  <div>
+    <div class="header-brand">HealthAgent</div>
+    <div class="header-tagline">Your personal wellness story</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn" onclick="loadDemo()">Try Demo</button>
+    <button class="btn-primary" onclick="document.getElementById('file-input').click()">Upload Your DNA</button>
     <input type="file" id="file-input" accept=".txt,.csv,.tsv,.vcf" onchange="uploadFile(this)">
   </div>
 </header>
 
-<!-- ── Main layout ────────────────────────────────────────────── -->
-<main>
+<!-- ══════════════════════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════════════════════ -->
+<section id="hero">
+  <canvas id="mini-helix"></canvas>
+  <div class="hero-content">
+    <div class="hero-title">Discover what your DNA says about you</div>
+    <div class="hero-sub">Upload your 23andMe or AncestryDNA file to unlock personalized wellness insights</div>
+    <div class="hero-count hidden" id="hero-count">
+      <span>✨</span>
+      <span><span id="insight-count">0</span> wellness insights found</span>
+    </div>
+  </div>
+</section>
 
-  <!-- Sidebar -->
-  <aside>
-    <div>
-      <h2>Base Legend</h2>
-      <div class="legend" style="margin-top:.6rem">
-        <div class="legend-item"><span class="dot dot-A"></span> A — Adenine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(purine)</span></div>
-        <div class="legend-item"><span class="dot dot-T"></span> T — Thymine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(pyrimidine)</span></div>
-        <div class="legend-item"><span class="dot dot-G"></span> G — Guanine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(purine)</span></div>
-        <div class="legend-item"><span class="dot dot-C"></span> C — Cytosine <span style="color:#4a5f7a;font-size:.75rem">(pyrimidine)</span></div>
+<!-- ══════════════════════════════════════════════════════════════
+     DEMO BANNER
+══════════════════════════════════════════════════════════════ -->
+<div id="demo-banner">
+  <span class="demo-banner-icon">🧪</span>
+  <span>Viewing demo profile — upload your own DNA file for personalized results</span>
+  <button class="btn" style="padding:0.25rem 0.75rem;font-size:0.78rem;" onclick="document.getElementById('file-input').click()">Upload Now</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     CATEGORY FILTER PILLS
+══════════════════════════════════════════════════════════════ -->
+<div id="category-bar">
+  <button class="cat-pill active" data-cat="all" onclick="TraitUI.filter('all', this)">All</button>
+  <button class="cat-pill" data-cat="nutrition" onclick="TraitUI.filter('nutrition', this)">🥗 Nutrition</button>
+  <button class="cat-pill" data-cat="fitness" onclick="TraitUI.filter('fitness', this)">💪 Fitness</button>
+  <button class="cat-pill" data-cat="sleep" onclick="TraitUI.filter('sleep', this)">🌙 Sleep</button>
+  <button class="cat-pill" data-cat="allergies" onclick="TraitUI.filter('allergies', this)">🤧 Allergies</button>
+  <button class="cat-pill" data-cat="supplements" onclick="TraitUI.filter('supplements', this)">💊 Supplements</button>
+  <button class="cat-pill" data-cat="health" onclick="TraitUI.filter('health', this)">❤️ Health</button>
+  <button class="cat-pill" data-cat="traits" onclick="TraitUI.filter('traits', this)">🧬 Traits</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════════════════ -->
+<div id="main-content">
+
+  <!-- Empty state -->
+  <div id="empty-state">
+    <div class="empty-illustration">
+      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- DNA double helix illustration -->
+        <circle cx="80" cy="80" r="78" fill="rgba(99,102,241,0.05)" stroke="rgba(99,102,241,0.15)" stroke-width="1.5"/>
+        <!-- Strand 1 -->
+        <path d="M55 20 C65 35, 45 50, 55 65 C65 80, 45 95, 55 110 C65 125, 45 140, 55 155" stroke="#6366f1" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
+        <!-- Strand 2 -->
+        <path d="M105 20 C95 35, 115 50, 105 65 C95 80, 115 95, 105 110 C95 125, 115 140, 105 155" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
+        <!-- Rungs -->
+        <line x1="57" y1="32" x2="103" y2="32" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+        <line x1="50" y1="48" x2="110" y2="48" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
+        <line x1="53" y1="65" x2="107" y2="65" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+        <line x1="50" y1="82" x2="110" y2="82" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
+        <line x1="53" y1="99" x2="107" y2="99" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+        <line x1="57" y1="116" x2="103" y2="116" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
+        <line x1="53" y1="132" x2="107" y2="132" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+        <!-- Base dots -->
+        <circle cx="57" cy="32" r="4" fill="#6366f1" opacity="0.8"/>
+        <circle cx="103" cy="32" r="4" fill="#8b5cf6" opacity="0.8"/>
+        <circle cx="53" cy="65" r="4" fill="#00cc44" opacity="0.8"/>
+        <circle cx="107" cy="65" r="4" fill="#ff3355" opacity="0.8"/>
+        <circle cx="50" cy="82" r="4" fill="#3399ff" opacity="0.8"/>
+        <circle cx="110" cy="82" r="4" fill="#ffaa00" opacity="0.8"/>
+        <circle cx="53" cy="99" r="4" fill="#6366f1" opacity="0.8"/>
+        <circle cx="107" cy="99" r="4" fill="#8b5cf6" opacity="0.8"/>
+        <circle cx="57" cy="116" r="4" fill="#00cc44" opacity="0.8"/>
+        <circle cx="103" cy="116" r="4" fill="#ff3355" opacity="0.8"/>
+      </svg>
+    </div>
+    <div class="empty-title">Your wellness story starts here</div>
+    <div class="empty-sub">Upload your raw DNA data file from 23andMe, AncestryDNA, or any compatible service to see personalized health insights based on your unique genetic profile.</div>
+    <div class="empty-actions">
+      <button class="btn-primary" style="padding:0.65rem 1.5rem;font-size:0.95rem;" onclick="document.getElementById('file-input').click()">📂 Upload your DNA file</button>
+      <span class="empty-or">or</span>
+      <button class="btn" style="padding:0.65rem 1.2rem;font-size:0.9rem;" onclick="loadDemo()">Try the demo</button>
+    </div>
+  </div>
+
+  <!-- Pending data notice (shown when databases not yet downloaded) -->
+  <div id="pending-traits-banner" class="hidden" style="
+    margin: 0.5rem 1rem 1rem;
+    padding: 0.75rem 1rem;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    color: #a5b4fc;
+  ">
+    <span style="font-size:1.1rem;">🔬</span>
+    <span id="pending-traits-text">Additional insights pending database download</span>
+    <button onclick="downloadDatabases()" style="
+      margin-left: auto;
+      background: rgba(99,102,241,0.2);
+      border: 1px solid rgba(99,102,241,0.4);
+      color: #a5b4fc;
+      border-radius: 6px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+    ">Download now</button>
+  </div>
+
+  <!-- Trait card grid (hidden until loaded) -->
+  <div id="trait-grid" class="hidden"></div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     CHROMOSOME SCANNER
+══════════════════════════════════════════════════════════════ -->
+<details id="chrom-scanner-section">
+  <summary>
+    <span>🧬</span>
+    <span>Chromosome Scanner</span>
+    <span style="font-size:0.8rem;color:#4a5f7a;font-weight:400;margin-left:0.5rem">— All 25 strands checked for findings</span>
+    <span class="science-chevron">▼</span>
+  </summary>
+
+  <div id="chrom-scanner-inner">
+    <div id="chrom-scan-header" style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap">
+      <div id="chrom-scan-summary" style="font-size:0.85rem;color:#4a5f7a"></div>
+      <button id="chrom-scan-btn" class="btn" onclick="ChromScanner.start()" style="margin-left:auto;padding:0.4rem 1rem;font-size:0.82rem">
+        🔬 Scan chromosomes
+      </button>
+    </div>
+
+    <div id="chrom-scan-progress" style="display:none;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+          <div id="chrom-scan-bar" style="height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:3px;transition:width 0.3s ease;width:0%"></div>
+        </div>
+        <span id="chrom-scan-pct" style="font-size:0.78rem;color:#6366f1;font-weight:700;min-width:2.5rem">0%</span>
+        <span id="chrom-scan-label" style="font-size:0.78rem;color:#94a3b8">Starting…</span>
       </div>
     </div>
-    <div>
-      <h2>Helix Key</h2>
-      <div class="legend" style="margin-top:.5rem;font-size:.8rem;gap:.5rem">
-        <div class="legend-item" style="color:#2a7ab8">▬ 5′→3′ sense strand</div>
-        <div class="legend-item" style="color:#c44870">▬ 3′→5′ antisense strand</div>
-        <div class="legend-item"><span style="color:#aaccff">· ·</span>&nbsp; A–T &nbsp;2 H-bonds</div>
-        <div class="legend-item"><span style="color:#aaccff">· · ·</span>&nbsp; G–C &nbsp;3 H-bonds</div>
-        <div class="legend-item" style="color:#4a8fbf">major groove (wide)</div>
-        <div class="legend-item" style="color:#bf4a6a">minor groove (narrow)</div>
-        <div class="legend-item" style="color:#4a5f7a;font-size:.75rem">~10 bp per full turn (B-DNA)</div>
+
+    <div id="chrom-grid"></div>
+
+    <div id="chrom-legend" style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:1rem;font-size:0.74rem;color:#64748b">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#6366f1;margin-right:4px;vertical-align:middle"></span>Wellness finding</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>Drug interaction</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#22c55e;margin-right:4px;vertical-align:middle"></span>Both</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e2e8f0;margin-right:4px;vertical-align:middle"></span>No findings</span>
+    </div>
+  </div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MICROBIOME SECTION
+══════════════════════════════════════════════════════════════ -->
+<details id="microbiome-section">
+  <summary>
+    <span>🦠</span>
+    <span>Gut Microbiome Profile</span>
+    <span style="font-size:0.8rem;color:#4a5f7a;font-weight:400;margin-left:0.5rem">— Upload your HUMAnN pathway file</span>
+    <span class="science-chevron">▼</span>
+  </summary>
+
+  <div id="microbiome-inner">
+    <div id="microbiome-upload-area">
+      <div style="font-size:2.5rem;margin-bottom:0.5rem">🦠</div>
+      <div style="font-weight:600;font-size:1rem;margin-bottom:0.4rem">Upload your microbiome data</div>
+      <div style="font-size:0.82rem;color:#4a5f7a;margin-bottom:1rem;max-width:420px;text-align:center">
+        Upload a <strong>*_pathabundance.tsv</strong> file from HUMAnN 3.x to see which gut metabolic pathways are active — butyrate production, gut-brain signals, vitamin biosynthesis, and more.
       </div>
+      <label class="btn-primary" style="cursor:pointer;padding:0.55rem 1.2rem;font-size:0.88rem">
+        📂 Choose pathabundance.tsv
+        <input type="file" id="microbiome-file-input" accept=".tsv" style="display:none" onchange="MicrobiomeUI.upload(this)">
+      </label>
+      <div id="microbiome-upload-status" style="margin-top:0.75rem;font-size:0.82rem;color:#4a5f7a"></div>
     </div>
 
-    <div>
-      <h2>Profile Stats</h2>
-      <div class="stats" style="margin-top:.5rem">
-        <div class="stat"><span>Format</span><span class="stat-val" id="st-format">—</span></div>
-        <div class="stat"><span>SNPs loaded</span><span class="stat-val" id="st-snps">—</span></div>
-        <div class="stat"><span>Chromosomes</span><span class="stat-val" id="st-chroms">—</span></div>
-        <div class="stat"><span>Viewing</span><span class="stat-val" id="st-viewing">—</span></div>
+    <div id="microbiome-results" style="display:none">
+      <div id="microbiome-summary-bar" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem;padding:0.75rem 1rem;background:rgba(99,102,241,0.06);border-radius:10px;align-items:center">
+        <span id="mb-pathway-count" style="font-weight:700;font-size:1.1rem;color:#6366f1"></span>
+        <span style="color:#4a5f7a;font-size:0.82rem">metabolic pathways detected</span>
+        <span id="mb-filename" style="margin-left:auto;font-size:0.78rem;color:#9ca3af;font-style:italic"></span>
       </div>
+      <div id="microbiome-card-grid"></div>
+    </div>
+  </div>
+</details>
+
+<!-- ══════════════════════════════════════════════════════════════
+     DB STATUS BAR
+══════════════════════════════════════════════════════════════ -->
+<div id="db-status-bar">
+  <div class="db-status-dot" id="db-dot"></div>
+  <span id="db-status-text">Checking databases…</span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     EXPLORE THE SCIENCE (collapsible)
+══════════════════════════════════════════════════════════════ -->
+<details id="science-section">
+  <summary>
+    <span>🔬</span>
+    <span>Explore the Science</span>
+    <span style="font-size:0.8rem;color:#4a5f7a;font-weight:400;margin-left:0.5rem">— Interactive DNA visualisations</span>
+    <span class="science-chevron">▼</span>
+  </summary>
+
+  <div id="science-inner">
+
+    <!-- Science sub-header -->
+    <div id="sci-header">
+      <h1>&#x1F9EC; DNA Visualiser</h1>
+      <span class="sci-badge">Science View</span>
+      <span class="sci-status-bar" id="sci-status">No profile loaded</span>
     </div>
 
-    <div>
-      <h2>Chromosome Filter</h2>
-      <div id="chrom-list" style="margin-top:.5rem">
-        <span style="font-size:.78rem;color:var(--muted)">Upload a file to filter</span>
-      </div>
-    </div>
+    <div id="sci-main">
 
-    <div>
-      <h2>Helix Speed</h2>
-      <div class="control-row" style="margin-top:.4rem">
-        <span>Slow</span>
-        <input type="range" id="speed-slider" min="0.2" max="4" step="0.1" value="1">
-        <span>Fast</span>
-      </div>
-    </div>
+      <!-- Sidebar -->
+      <aside id="sci-aside">
+        <div>
+          <h2>Base Legend</h2>
+          <div class="sci-legend" style="margin-top:.6rem">
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-A"></span> A — Adenine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(purine)</span></div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-T"></span> T — Thymine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(pyrimidine)</span></div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-G"></span> G — Guanine &nbsp;<span style="color:#4a5f7a;font-size:.75rem">(purine)</span></div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-C"></span> C — Cytosine <span style="color:#4a5f7a;font-size:.75rem">(pyrimidine)</span></div>
+          </div>
+        </div>
+        <div>
+          <h2>Helix Key</h2>
+          <div class="sci-legend" style="margin-top:.5rem;font-size:.8rem;gap:.5rem">
+            <div class="sci-legend-item" style="color:#2a7ab8">▬ 5′→3′ sense strand</div>
+            <div class="sci-legend-item" style="color:#c44870">▬ 3′→5′ antisense strand</div>
+            <div class="sci-legend-item"><span style="color:#aaccff">· ·</span>&nbsp; A–T &nbsp;2 H-bonds</div>
+            <div class="sci-legend-item"><span style="color:#aaccff">· · ·</span>&nbsp; G–C &nbsp;3 H-bonds</div>
+            <div class="sci-legend-item" style="color:#4a8fbf">major groove (wide)</div>
+            <div class="sci-legend-item" style="color:#bf4a6a">minor groove (narrow)</div>
+            <div class="sci-legend-item" style="color:#4a5f7a;font-size:.75rem">~10 bp per full turn (B-DNA)</div>
+          </div>
+        </div>
+        <div>
+          <h2>Profile Stats</h2>
+          <div class="sci-stats" style="margin-top:.5rem">
+            <div class="sci-stat"><span>Format</span><span class="sci-stat-val" id="st-format">—</span></div>
+            <div class="sci-stat"><span>SNPs loaded</span><span class="sci-stat-val" id="st-snps">—</span></div>
+            <div class="sci-stat"><span>Chromosomes</span><span class="sci-stat-val" id="st-chroms">—</span></div>
+            <div class="sci-stat"><span>Viewing</span><span class="sci-stat-val" id="st-viewing">—</span></div>
+          </div>
+        </div>
+        <div>
+          <h2>Chromosome Filter</h2>
+          <div id="sci-chrom-list" style="margin-top:.5rem">
+            <span style="font-size:.78rem;color:#4a5f7a">Upload a file to filter</span>
+          </div>
+        </div>
+        <div>
+          <h2>Helix Speed</h2>
+          <div class="sci-control-row" style="margin-top:.4rem">
+            <span>Slow</span>
+            <input type="range" id="speed-slider" min="0.2" max="4" step="0.1" value="1">
+            <span>Fast</span>
+          </div>
+        </div>
+        <div>
+          <h2>Strand zoom</h2>
+          <div class="sci-control-row" style="margin-top:.4rem">
+            <span>-</span>
+            <input type="range" id="zoom-slider" min="4" max="24" step="1" value="10">
+            <span>+</span>
+          </div>
+        </div>
+        <div>
+          <h2>Staining Modes</h2>
+          <div class="sci-legend" style="margin-top:.5rem;font-size:.78rem;gap:.45rem">
+            <div class="sci-legend-item"><span class="sci-dot" style="background:#00cc44;box-shadow:0 0 5px #00cc44"></span> Natural — AGTC colours</div>
+            <div class="sci-legend-item"><span class="sci-dot" style="background:#7b6fff;box-shadow:0 0 8px #7b6fff"></span> DAPI — UV blue-violet fluorescence</div>
+            <div class="sci-legend-item"><span class="sci-dot" style="background:#aaff44;box-shadow:0 0 8px #aaff44"></span> SYBR Green — intercalating dye</div>
+            <div class="sci-legend-item"><span class="sci-dot" style="background:#ff8800;box-shadow:0 0 8px #ff8800"></span> EtBr/UV — ethidium bromide under UV</div>
+          </div>
+        </div>
+        <div>
+          <h2>Gel View</h2>
+          <div class="sci-legend" style="margin-top:.5rem;font-size:.78rem;gap:.4rem;color:#4a5f7a">
+            <div>Each lane = one chromosome</div>
+            <div>Band position ∝ SNP density</div>
+            <div>Band brightness = fragment count</div>
+            <div>Stain colour follows mode above</div>
+          </div>
+        </div>
+        <div>
+          <h2>Chromatogram</h2>
+          <div class="sci-legend" style="margin-top:.5rem;font-size:.78rem;gap:.4rem">
+            <div style="color:#4a5f7a">Sanger sequencing trace</div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-A"></span> A — green trace</div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-T"></span> T — red trace</div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-G"></span> G — blue trace</div>
+            <div class="sci-legend-item"><span class="sci-dot sci-dot-C"></span> C — amber trace</div>
+            <div style="color:#4a5f7a;font-size:.72rem;margin-top:.2rem">Peak height = fluorescence intensity<br>Base call letter at each peak apex<br>15% bleed into complement channel</div>
+          </div>
+        </div>
+      </aside>
 
-    <div>
-      <h2>Strand zoom</h2>
-      <div class="control-row" style="margin-top:.4rem">
-        <span>-</span>
-        <input type="range" id="zoom-slider" min="4" max="24" step="1" value="10">
-        <span>+</span>
-      </div>
-    </div>
+      <!-- Helix panel -->
+      <section id="sci-helix-section">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <h2 style="flex:1;color:#4a5f7a;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em">Double Helix — AGTC Base-Pair Bindings</h2>
+          <div class="sci-stain-bar">
+            <span>Stain:</span>
+            <button class="sci-stain-btn s-natural active" onclick="setStain('natural',this)">Natural</button>
+            <button class="sci-stain-btn s-dapi"    onclick="setStain('dapi',this)">DAPI</button>
+            <button class="sci-stain-btn s-sybr"    onclick="setStain('sybr',this)">SYBR Green</button>
+            <button class="sci-stain-btn s-etbr"    onclick="setStain('etbr',this)">EtBr/UV</button>
+          </div>
+        </div>
+        <canvas id="helix-canvas"></canvas>
+      </section>
 
-    <div>
-      <h2>Staining Modes</h2>
-      <div class="legend" style="margin-top:.5rem;font-size:.78rem;gap:.45rem">
-        <div class="legend-item"><span class="dot" style="background:#00cc44;box-shadow:0 0 5px #00cc44"></span> Natural — AGTC colours</div>
-        <div class="legend-item"><span class="dot" style="background:#7b6fff;box-shadow:0 0 8px #7b6fff"></span> DAPI — UV blue-violet fluorescence</div>
-        <div class="legend-item"><span class="dot" style="background:#aaff44;box-shadow:0 0 8px #aaff44"></span> SYBR Green — intercalating dye</div>
-        <div class="legend-item"><span class="dot" style="background:#ff8800;box-shadow:0 0 8px #ff8800"></span> EtBr/UV — ethidium bromide under UV</div>
-      </div>
-    </div>
+      <!-- Bottom tabbed panel -->
+      <section id="sci-bottom-section">
+        <div class="sci-tab-bar">
+          <button class="sci-tab-btn active" onclick="switchTab('strand',this)">Strand View</button>
+          <button class="sci-tab-btn"        onclick="switchTab('gel',this)">Gel Electrophoresis</button>
+          <button class="sci-tab-btn"        onclick="switchTab('chromatogram',this)">Sequencing Chromatogram</button>
+        </div>
+        <div id="tab-strand" class="sci-tab-pane active">
+          <p style="font-size:.75rem;color:#4a5f7a;margin-bottom:.3rem">Colorised sense / antisense nucleotide sequence</p>
+          <canvas id="strand-canvas"></canvas>
+        </div>
+        <div id="tab-gel" class="sci-tab-pane">
+          <p style="font-size:.75rem;color:#4a5f7a;margin-bottom:.3rem">Agarose gel simulation — SNP density per chromosome under UV staining</p>
+          <canvas id="gel-canvas"></canvas>
+        </div>
+        <div id="tab-chromatogram" class="sci-tab-pane">
+          <p style="font-size:.75rem;color:#4a5f7a;margin-bottom:.3rem">Sanger sequencing electropherogram — fluorescence intensity traces per base</p>
+          <canvas id="chroma-canvas"></canvas>
+        </div>
+      </section>
 
-    <div>
-      <h2>Gel View</h2>
-      <div class="legend" style="margin-top:.5rem;font-size:.78rem;gap:.4rem;color:var(--muted)">
-        <div>Each lane = one chromosome</div>
-        <div>Band position ∝ SNP density</div>
-        <div>Band brightness = fragment count</div>
-        <div>Stain colour follows mode above</div>
-      </div>
-    </div>
+    </div><!-- /sci-main -->
+  </div><!-- /science-inner -->
+</details>
 
-    <div>
-      <h2>Chromatogram</h2>
-      <div class="legend" style="margin-top:.5rem;font-size:.78rem;gap:.4rem">
-        <div style="color:var(--muted)">Sanger sequencing trace</div>
-        <div class="legend-item"><span class="dot dot-A"></span> A — green trace</div>
-        <div class="legend-item"><span class="dot dot-T"></span> T — red trace</div>
-        <div class="legend-item"><span class="dot dot-G"></span> G — blue trace</div>
-        <div class="legend-item"><span class="dot dot-C"></span> C — amber trace</div>
-        <div style="color:var(--muted);font-size:.72rem;margin-top:.2rem">Peak height = fluorescence intensity<br>Base call letter at each peak apex<br>15% bleed into complement channel</div>
-      </div>
-    </div>
-  </aside>
 
-  <!-- Helix panel -->
-  <section id="helix-section">
-    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-      <h2 style="flex:1">Double Helix — AGTC Base-Pair Bindings</h2>
-      <div class="stain-bar">
-        <span>Stain:</span>
-        <button class="stain-btn s-natural active" onclick="setStain('natural',this)">Natural</button>
-        <button class="stain-btn s-dapi"    onclick="setStain('dapi',this)">DAPI</button>
-        <button class="stain-btn s-sybr"    onclick="setStain('sybr',this)">SYBR Green</button>
-        <button class="stain-btn s-etbr"    onclick="setStain('etbr',this)">EtBr/UV</button>
-      </div>
-    </div>
-    <canvas id="helix-canvas"></canvas>
-  </section>
-
-  <!-- Bottom tabbed panel -->
-  <section id="bottom-section">
-    <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('strand',this)">Strand View</button>
-      <button class="tab-btn"        onclick="switchTab('gel',this)">Gel Electrophoresis</button>
-      <button class="tab-btn"        onclick="switchTab('chromatogram',this)">Sequencing Chromatogram</button>
-    </div>
-    <div id="tab-strand" class="tab-pane active">
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Colorised sense / antisense nucleotide sequence</p>
-      <canvas id="strand-canvas"></canvas>
-    </div>
-    <div id="tab-gel" class="tab-pane">
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Agarose gel simulation — SNP density per chromosome under UV staining</p>
-      <canvas id="gel-canvas"></canvas>
-    </div>
-    <div id="tab-chromatogram" class="tab-pane">
-      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Sanger sequencing electropherogram — fluorescence intensity traces per base</p>
-      <canvas id="chroma-canvas"></canvas>
-    </div>
-  </section>
-
-</main>
-
+<!-- ══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
 <script>
+// ═══════════════════════════════════════════════════════════════════
+//  TRAIT UI — consumer health dashboard
+// ═══════════════════════════════════════════════════════════════════
+
+const TraitUI = {
+  allTraits: [],
+  activeCategory: 'all',
+
+  // Category name normalisation map
+  CAT_MAP: {
+    'nutrition':    { label: '🥗 Nutrition',    color: '#22c55e', bg: 'rgba(34,197,94,0.12)'    },
+    'fitness':      { label: '💪 Fitness',      color: '#f97316', bg: 'rgba(249,115,22,0.12)'   },
+    'sleep':        { label: '🌙 Sleep',        color: '#818cf8', bg: 'rgba(129,140,248,0.12)'  },
+    'allergies':    { label: '🤧 Allergies',    color: '#06b6d4', bg: 'rgba(6,182,212,0.12)'    },
+    'supplements':  { label: '💊 Supplements',  color: '#a78bfa', bg: 'rgba(167,139,250,0.12)'  },
+    'health':       { label: '❤️ Health',       color: '#f43f5e', bg: 'rgba(244,63,94,0.12)'    },
+    'traits':       { label: '🧬 Traits',       color: '#6366f1', bg: 'rgba(99,102,241,0.12)'   },
+    'wellness':     { label: '🌿 Wellness',      color: '#10b981', bg: 'rgba(16,185,129,0.12)'   },
+    'gwas':         { label: '🔬 GWAS',          color: '#64748b', bg: 'rgba(100,116,139,0.12)'  },
+    'clinvar':      { label: '🏥 Clinical',      color: '#f43f5e', bg: 'rgba(244,63,94,0.12)'    },
+    'drugs':        { label: '💊 Drug Response', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)'  },
+  },
+
+  getCatInfo(category) {
+    if (!category) return { label: '🧬 Traits', color: '#6366f1', bg: 'rgba(99,102,241,0.12)' };
+    const key = category.toLowerCase().replace(/\s+/g, '');
+    return this.CAT_MAP[key] || { label: '🧬 ' + category, color: '#6366f1', bg: 'rgba(99,102,241,0.12)' };
+  },
+
+  async load() {
+    try {
+      const data = await apiFetch('/api/traits');
+      // Filter out any cards with no trait_name (shouldn't happen after server fix, but guard)
+      const validTrait = t => !!(t.trait_name || t.condition || t.drug_name);
+      this.allTraits = [
+        ...(data.wellness || []).filter(validTrait),
+        ...(data.gwas     || []).filter(validTrait),
+        ...(data.clinvar  || []).filter(validTrait),
+        ...(data.drugs    || []).filter(validTrait),
+      ];
+      this.render(this.activeCategory);
+      this.updateHeroCount(this.allTraits.length);
+
+      // Show pending banner if GWAS + ClinVar + drugs are all empty (db not downloaded yet)
+      const pendingBanner = document.getElementById('pending-traits-banner');
+      const pendingText   = document.getElementById('pending-traits-text');
+      const summary = data.summary || {};
+      const dbStats = summary.db_stats || {};
+      const gwasRows = dbStats.gwas_association || 0;
+      const clinvarRows = dbStats.clinvar_variant || 0;
+      const drugRows = dbStats.drug_interaction || 0;
+      if (pendingBanner) {
+        if (gwasRows === 0 && clinvarRows === 0) {
+          const totalSnps = summary.total_snps || 0;
+          const estPending = Math.max(0, totalSnps - this.allTraits.length);
+          pendingText.textContent = `${totalSnps.toLocaleString()} SNPs analysed · GWAS & ClinVar databases not yet downloaded — up to thousands more insights available`;
+          pendingBanner.classList.remove('hidden');
+          pendingBanner.style.display = 'flex';
+        } else {
+          pendingBanner.classList.add('hidden');
+          pendingBanner.style.display = 'none';
+        }
+      }
+    } catch(e) {
+      console.error('TraitUI.load error:', e);
+    }
+  },
+
+  filter(category, btn) {
+    this.activeCategory = category;
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    this.render(category);
+  },
+
+  render(category) {
+    const grid = document.getElementById('trait-grid');
+    const empty = document.getElementById('empty-state');
+
+    const filtered = category === 'all'
+      ? this.allTraits
+      : this.allTraits.filter(t => {
+          const cat = (t.category || '').toLowerCase();
+          return cat.includes(category) ||
+                 (t.category_label || '').toLowerCase().includes(category);
+        });
+
+    if (!filtered.length && !this.allTraits.length) {
+      grid.classList.add('hidden');
+      empty.style.display = 'flex';
+      return;
+    }
+
+    empty.style.display = 'none';
+    grid.classList.remove('hidden');
+    grid.innerHTML = '';
+
+    filtered.forEach((trait, i) => {
+      const card = this.buildCard(trait);
+      grid.appendChild(card);
+      // Staggered entrance animation
+      setTimeout(() => card.classList.add('visible'), 60 * i);
+    });
+  },
+
+  buildCard(trait) {
+    const cat = this.getCatInfo(trait.category);
+    // Prefer backend-supplied colors if available
+    const catColor = trait.category_color || cat.color;
+    const catBg    = cat.bg;
+
+    const card = document.createElement('div');
+    card.className = 'trait-card';
+    card.style.setProperty('--cat-color', catColor);
+    card.style.setProperty('--cat-bg', catBg);
+
+    // Risk badge styling
+    const riskColor  = trait.risk_color || '#94a3b8';
+    const riskBg     = trait.risk_bg    || 'rgba(148,163,184,0.12)';
+    const riskLabel  = trait.risk_label || trait.risk_level || '';
+
+    // Icon: prefer trait icon, fallback to category emoji
+    const icon = trait.icon || cat.label.split(' ')[0];
+    const catLabel = trait.category_label || cat.label.replace(/^[^\s]+ /, '');
+
+    card.innerHTML = `
+      <div class="trait-card-inner">
+        <div class="card-header">
+          <div class="card-icon" style="background:${catBg};border:1px solid ${catColor}22;">
+            <span>${icon}</span>
+          </div>
+          <div class="card-title-group">
+            <div class="card-trait-name">${escHtml(trait.trait_name || 'Unknown Trait')}</div>
+            <div class="card-category-label" style="color:${catColor}">${escHtml(catLabel)}</div>
+          </div>
+          ${riskLabel ? `<span class="risk-badge" style="color:${riskColor};background:${riskBg};border:1px solid ${riskColor}33;">${escHtml(riskLabel)}</span>` : ''}
+        </div>
+
+        ${trait.your_result ? `
+        <div>
+          <div class="card-result-label">Your result</div>
+          <div class="card-result">${escHtml(trait.your_result)}</div>
+        </div>` : ''}
+
+        ${trait.detail ? `
+        <div>
+          <div class="card-detail" id="detail-${safeId(trait.rsid)}">${escHtml(trait.detail)}</div>
+          <span class="expand-toggle" onclick="toggleDetail('${safeId(trait.rsid)}', this)">Show more ↓</span>
+        </div>` : ''}
+
+        ${trait.what_to_do ? `
+        <div class="card-action">
+          <div class="card-action-header">💡 What you can do</div>
+          <div class="card-action-text">${escHtml(trait.what_to_do)}</div>
+        </div>` : ''}
+      </div>
+
+      <div class="card-footer">
+        ${trait.gene ? `<span class="card-gene">${escHtml(trait.gene)}</span>` : ''}
+        ${trait.rsid ? `<span class="card-rsid">${escHtml(trait.rsid)}</span>` : ''}
+      </div>
+    `;
+
+    return card;
+  },
+
+  updateHeroCount(n) {
+    const heroCount = document.getElementById('hero-count');
+    const countEl   = document.getElementById('insight-count');
+    heroCount.classList.remove('hidden');
+    // Animated count-up
+    let current = 0;
+    const step  = Math.max(1, Math.floor(n / 40));
+    const timer = setInterval(() => {
+      current = Math.min(current + step, n);
+      countEl.textContent = current;
+      if (current >= n) clearInterval(timer);
+    }, 25);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════════════
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function safeId(rsid) {
+  return (rsid || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function toggleDetail(id, btn) {
+  const el = document.getElementById('detail-' + id);
+  if (!el) return;
+  const expanded = el.classList.toggle('expanded');
+  btn.textContent = expanded ? 'Show less ↑' : 'Show more ↓';
+}
+
+async function apiFetch(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.detail || r.statusText);
+  }
+  return r.json();
+}
+
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg || 'Loading…';
+  document.getElementById('loading-default').style.display = 'flex';
+  document.getElementById('upload-card').style.display = 'none';
+  document.getElementById('loading-overlay').classList.add('visible');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('visible');
+  document.getElementById('loading-default').style.display = 'flex';
+  document.getElementById('upload-card').style.display = 'none';
+}
+
+function showUploadCard(filename) {
+  document.getElementById('uc-title').textContent = `Uploading ${filename}`;
+  document.getElementById('uc-bar').style.width = '0%';
+  document.getElementById('uc-pct').textContent = '0%';
+  document.getElementById('uc-step').textContent = 'Preparing…';
+  document.getElementById('loading-default').style.display = 'none';
+  document.getElementById('upload-card').style.display = 'flex';
+  document.getElementById('loading-overlay').classList.add('visible');
+}
+function updateUploadCard(chunkIdx, totalChunks, stepMsg) {
+  const pct = Math.round(((chunkIdx + 1) / totalChunks) * 100);
+  document.getElementById('uc-bar').style.width = pct + '%';
+  document.getElementById('uc-pct').textContent = pct + '%';
+  document.getElementById('uc-step').textContent = stepMsg || '';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Upload / Demo flow
+// ═══════════════════════════════════════════════════════════════════
+async function loadDemo() {
+  showLoading('Loading demo profile…');
+  try {
+    const d = await apiFetch('/api/demo');
+    await afterLoad(d);
+  } catch(e) {
+    console.error(e);
+    alert('Error loading demo: ' + e.message);
+  } finally { hideLoading(); }
+}
+
+// ── Chunked + encrypted DNA upload ──────────────────────────────
+// Files > 4 MB are split into 4 MB chunks, each AES-GCM encrypted
+// with a per-session key, then uploaded sequentially.
+// The server reassembles and decrypts all chunks atomically.
+
+const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
+
+async function uploadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (file.size <= CHUNK_SIZE) {
+    // Small file — direct upload (no chunking needed)
+    showLoading(`Uploading ${file.name}…`);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const d = await apiFetch('/api/upload', { method: 'POST', body: fd });
+      await afterLoad(d);
+    } catch(e) {
+      console.error(e);
+      alert('Upload error: ' + e.message);
+    } finally { hideLoading(); }
+    return;
+  }
+
+  // ── Large file: chunked AES-GCM encrypted upload ──────────────
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const uploadId    = crypto.randomUUID();
+
+  showUploadCard(file.name);
+
+  // Generate a one-time AES-256-GCM key for this upload session
+  const key = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+  );
+  // Export raw key bytes to send with the final commit request
+  const rawKey = await crypto.subtle.exportKey('raw', key);
+  const keyB64 = btoa(String.fromCharCode(...new Uint8Array(rawKey)));
+
+  try {
+    for (let i = 0; i < totalChunks; i++) {
+      updateUploadCard(i, totalChunks, `Encrypting & uploading chunk ${i + 1} of ${totalChunks}…`);
+      const start  = i * CHUNK_SIZE;
+      const slice  = file.slice(start, start + CHUNK_SIZE);
+      const plain  = await slice.arrayBuffer();
+
+      // Unique 96-bit IV per chunk
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain);
+
+      // Pack: [12-byte IV][ciphertext]
+      const packed = new Uint8Array(12 + cipher.byteLength);
+      packed.set(iv, 0);
+      packed.set(new Uint8Array(cipher), 12);
+
+      const fd = new FormData();
+      fd.append('upload_id',    uploadId);
+      fd.append('chunk_index',  String(i));
+      fd.append('total_chunks', String(totalChunks));
+      fd.append('filename',     file.name);
+      fd.append('chunk',        new Blob([packed], { type: 'application/octet-stream' }));
+
+      const resp = await fetch('/api/upload/chunk', { method: 'POST', body: fd });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || 'Chunk upload failed');
+      }
+    }
+
+    // All chunks uploaded — commit with the AES key so server can decrypt
+    updateUploadCard(totalChunks - 1, totalChunks, 'Assembling & parsing your DNA file…');
+    const commitResp = await fetch('/api/upload/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upload_id: uploadId, aes_key_b64: keyB64, filename: file.name }),
+    });
+    if (!commitResp.ok) {
+      const err = await commitResp.json().catch(() => ({ detail: commitResp.statusText }));
+      throw new Error(err.detail || 'Commit failed');
+    }
+    const d = await commitResp.json();
+    await afterLoad(d);
+  } catch(e) {
+    console.error(e);
+    alert('Upload error: ' + e.message);
+  } finally { hideLoading(); }
+}
+
+async function afterLoad(info) {
+  // Show/hide demo banner
+  const banner = document.getElementById('demo-banner');
+  if (info.filename === 'demo' || (info.filename || '').includes('demo')) {
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+
+  // Reset chromosome scanner so it re-runs for new profile
+  ChromScanner._data = null;
+  document.getElementById('chrom-grid').innerHTML = '';
+  document.getElementById('chrom-scan-summary').innerHTML = '';
+  document.getElementById('chrom-scan-progress').style.display = 'none';
+  const scanBtn = document.getElementById('chrom-scan-btn');
+  if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '🔬 Scan chromosomes'; }
+
+  // Update science section stats
+  document.getElementById('sci-status').textContent =
+    `${info.filename}  ·  ${info.format}  ·  ${(info.snp_count||0).toLocaleString()} SNPs`;
+  document.getElementById('st-format').textContent = info.format || '—';
+  document.getElementById('st-snps').textContent   = (info.snp_count||0).toLocaleString();
+
+  // Load chromosomes for science view
+  try {
+    const { chromosomes } = await apiFetch('/api/chromosomes');
+    document.getElementById('st-chroms').textContent = chromosomes.length;
+    buildChromFilter(chromosomes);
+  } catch(_) {}
+
+  // Reset science SNP data
+  activeChrom = null;
+  try { await fetchSNPs(); } catch(_) {}
+
+  // Load trait cards
+  await TraitUI.load();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DB Status bar
+// ═══════════════════════════════════════════════════════════════════
+async function loadDbStatus() {
+  const dot  = document.getElementById('db-dot');
+  const text = document.getElementById('db-status-text');
+  try {
+    const s = await apiFetch('/api/db/status');
+    const wc = s.wellness_trait_count || s.wellness_traits || 0;
+    const downloading = s.downloading || s.status === 'downloading';
+    if (downloading) {
+      dot.className = 'db-status-dot loading';
+      text.textContent = `${wc.toLocaleString()} wellness traits loaded · GWAS/ClinVar databases downloading in background…`;
+    } else {
+      dot.className = 'db-status-dot';
+      text.textContent = `${wc.toLocaleString()} wellness traits · GWAS & ClinVar databases ready`;
+    }
+  } catch(_) {
+    dot.className = 'db-status-dot';
+    text.textContent = 'Database status unavailable';
+  }
+}
+
+async function downloadDatabases() {
+  const btn = document.querySelector('#pending-traits-banner button');
+  if (btn) { btn.textContent = 'Starting…'; btn.disabled = true; }
+  try {
+    await apiFetch('/api/db/update', { method: 'POST' });
+    const text = document.getElementById('pending-traits-text');
+    if (text) text.textContent = 'Database download started in background — reload insights in a few minutes';
+    if (btn) { btn.textContent = 'Downloading…'; }
+    loadDbStatus();
+  } catch(e) {
+    if (btn) { btn.textContent = 'Download now'; btn.disabled = false; }
+    console.error('downloadDatabases error:', e);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Colour palettes — natural + fluorescent staining modes
 //
@@ -413,16 +1894,16 @@ let activeTab = 'strand';
 function setStain(mode, btn) {
   stainMode = mode;
   currentStain = STAINS[mode];
-  document.querySelectorAll('.stain-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sci-stain-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   // Update helix section background to match stain
-  document.getElementById('helix-section').style.background = currentStain.bg;
+  document.getElementById('sci-helix-section').style.background = currentStain.bg;
 }
 
 function switchTab(tab, btn) {
   activeTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sci-tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sci-tab-pane').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
 }
@@ -443,78 +1924,33 @@ let raf       = null;
 let activeChrom = null;
 
 // ═══════════════════════════════════════════════════════════════════
-//  API helpers
+//  API helpers (science section)
 // ═══════════════════════════════════════════════════════════════════
-async function api(path, opts) {
-  const r = await fetch(path, opts);
-  if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
-  return r.json();
-}
-
-async function loadDemo() {
-  setStatus('Loading demo…');
-  try {
-    const d = await api('/api/demo');
-    await afterLoad(d);
-  } catch(e) { setStatus('Error: ' + e.message); }
-}
-
-async function uploadFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  setStatus(`Uploading ${file.name}…`);
-  const fd = new FormData();
-  fd.append('file', file);
-  try {
-    const d = await api('/api/upload', { method: 'POST', body: fd });
-    await afterLoad(d);
-  } catch(e) { setStatus('Error: ' + e.message); }
-}
-
-async function afterLoad(info) {
-  setStatus(`${info.filename}  ·  ${info.format}  ·  ${info.snp_count.toLocaleString()} SNPs`);
-  document.getElementById('st-format').textContent  = info.format;
-  document.getElementById('st-snps').textContent    = info.snp_count.toLocaleString();
-
-  // Load chromosomes
-  const { chromosomes } = await api('/api/chromosomes');
-  document.getElementById('st-chroms').textContent = chromosomes.length;
-  buildChromFilter(chromosomes);
-
-  // Load first batch of SNPs
-  activeChrom = null;
-  await fetchSNPs();
-}
-
 async function fetchSNPs(chrom) {
   const q = chrom ? `?chromosome=${chrom}&limit=500` : '?limit=500';
   try {
-    const d = await api('/api/snps' + q);
+    const d = await apiFetch('/api/snps' + q);
     snpData = d.snps;
     document.getElementById('st-viewing').textContent =
       snpData.length.toLocaleString() + (chrom ? ` (chr ${chrom})` : ' (all)');
     strandOff = 0;
-  } catch(e) { setStatus('Error: ' + e.message); }
-}
-
-function setStatus(msg) {
-  document.getElementById('status-bar').textContent = msg;
+  } catch(e) { console.warn('fetchSNPs:', e.message); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
 //  Chromosome filter buttons
 // ═══════════════════════════════════════════════════════════════════
 function buildChromFilter(chroms) {
-  const el = document.getElementById('chrom-list');
+  const el = document.getElementById('sci-chrom-list');
   el.innerHTML = '';
   const all = document.createElement('button');
-  all.className = 'chrom-btn active';
+  all.className = 'sci-chrom-btn active';
   all.textContent = 'ALL';
   all.onclick = () => selectChrom(null, all);
   el.appendChild(all);
   chroms.forEach(c => {
     const b = document.createElement('button');
-    b.className = 'chrom-btn';
+    b.className = 'sci-chrom-btn';
     b.textContent = c;
     b.onclick = () => selectChrom(c, b);
     el.appendChild(b);
@@ -522,7 +1958,7 @@ function buildChromFilter(chroms) {
 }
 
 async function selectChrom(chrom, btn) {
-  document.querySelectorAll('.chrom-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sci-chrom-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   activeChrom = chrom;
   await fetchSNPs(chrom);
@@ -800,7 +2236,7 @@ function drawStrands(canvas, snps, offsetX, cellW) {
     ctx.fillStyle = '#334';
     ctx.font = '14px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('Load a DNA file or click "Load Demo" to begin', w / 2, h / 2);
+    ctx.fillText('Load a DNA file or click "Try Demo" to begin', w / 2, h / 2);
     return;
   }
 
@@ -1212,15 +2648,75 @@ function drawChromatogram(canvas, snps, offsetPx) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  Mini helix for hero background
+// ═══════════════════════════════════════════════════════════════════
+function drawMiniHelix(canvas, theta) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr  = window.devicePixelRatio || 1;
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const cx    = w / 2;
+  const pitch = 80;
+  const rx    = Math.min(w * 0.08, 40);
+  const turns = h / pitch + 2;
+  const steps = Math.round(turns * 10) * 6;
+
+  const s1 = [], s2 = [];
+  for (let i = 0; i <= steps; i++) {
+    const frac = i / steps;
+    const t    = frac * Math.PI * 2 * turns + theta;
+    const y    = frac * h;
+    s1.push({ x: cx + rx * Math.cos(t), y, z: Math.sin(t) });
+    s2.push({ x: cx + rx * Math.cos(t + Math.PI), y, z: Math.sin(t + Math.PI) });
+  }
+
+  // Draw strands
+  [[s1, '#6366f1'], [s2, '#8b5cf6']].forEach(([pts, col]) => {
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // Rungs
+  const totalBP = Math.round(turns * 10);
+  const spb = 6;
+  for (let bp = 0; bp < totalBP; bp++) {
+    const i = bp * spb;
+    if (i >= s1.length) break;
+    const p1 = s1[i], p2 = s2[i];
+    const depth = ((p1.z + p2.z) / 2 + 1) / 2;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = `rgba(139,92,246,${0.15 + 0.5 * depth})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  Animation loop
 // ═══════════════════════════════════════════════════════════════════
 const helixCanvas  = document.getElementById('helix-canvas');
 const strandCanvas = document.getElementById('strand-canvas');
 const gelCanvas    = document.getElementById('gel-canvas');
 const chromaCanvas = document.getElementById('chroma-canvas');
+const miniHelixCanvas = document.getElementById('mini-helix');
 
-let chromaOff = 0;   // chromatogram scroll offset in px
-let lastTime  = null;
+let chromaOff  = 0;   // chromatogram scroll offset in px
+let miniAngle  = 0;
+let lastTime   = null;
 
 function loop(ts) {
   if (lastTime === null) lastTime = ts;
@@ -1231,14 +2727,21 @@ function loop(ts) {
   const maxChroma = Math.max(1, snpData.length * 28);
 
   angle     = (angle + dt * speed * 0.6) % (Math.PI * 2);
+  miniAngle = (miniAngle + dt * 0.4) % (Math.PI * 2);
   strandOff = (strandOff + dt * speed * zoom * 4) % maxStrand;
   chromaOff = (chromaOff + dt * speed * 22)       % maxChroma;
 
-  drawHelix(helixCanvas, snpData, angle);
+  // Only draw science canvases if science section is open
+  const sciOpen = document.getElementById('science-section').open;
+  if (sciOpen) {
+    drawHelix(helixCanvas, snpData, angle);
+    if      (activeTab === 'strand')       drawStrands(strandCanvas, snpData, strandOff, zoom);
+    else if (activeTab === 'gel')          drawGel(gelCanvas, snpData);
+    else if (activeTab === 'chromatogram') drawChromatogram(chromaCanvas, snpData, chromaOff);
+  }
 
-  if      (activeTab === 'strand')      drawStrands(strandCanvas, snpData, strandOff, zoom);
-  else if (activeTab === 'gel')         drawGel(gelCanvas, snpData);
-  else if (activeTab === 'chromatogram') drawChromatogram(chromaCanvas, snpData, chromaOff);
+  // Always draw mini helix in hero
+  drawMiniHelix(miniHelixCanvas, miniAngle);
 
   raf = requestAnimationFrame(loop);
 }
@@ -1251,16 +2754,6 @@ document.getElementById('zoom-slider').addEventListener('input', e => {
   zoom = parseInt(e.target.value, 10);
 });
 
-// Start loop
-window.addEventListener('load', () => {
-  requestAnimationFrame(loop);
-  drawStrands(strandCanvas, [], 0, zoom);
-});
-
-window.addEventListener('resize', () => {
-  // canvases are resized inside each draw call
-});
-
 // ═══════════════════════════════════════════════════════════════════
 //  Utility
 // ═══════════════════════════════════════════════════════════════════
@@ -1270,6 +2763,265 @@ function withAlpha(hex, a) {
   const b = parseInt(hex.slice(5,7),16);
   return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  requestAnimationFrame(loop);
+  loadDbStatus();
+  ChromScanner.init();
+});
+
+window.addEventListener('resize', () => {
+  // canvases are resized inside each draw call
+});
+
+// ════════════════════════════════════════════════════════════════
+//  CHROMOSOME SCANNER
+// ════════════════════════════════════════════════════════════════
+const ChromScanner = {
+
+  _data: null,
+
+  async start() {
+    // Open the section if not already open
+    document.getElementById('chrom-scanner-section').open = true;
+
+    const btn = document.getElementById('chrom-scan-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Scanning…';
+
+    const progress = document.getElementById('chrom-scan-progress');
+    const bar      = document.getElementById('chrom-scan-bar');
+    const pct      = document.getElementById('chrom-scan-pct');
+    const label    = document.getElementById('chrom-scan-label');
+    progress.style.display = 'block';
+
+    // Fetch all 25 chromosome results in one call
+    let data;
+    try {
+      data = await apiFetch('/api/scan');
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = '🔬 Scan chromosomes';
+      progress.style.display = 'none';
+      alert('Scan failed: ' + e.message);
+      return;
+    }
+
+    ChromScanner._data = data;
+    const chroms = data.chromosomes;
+    const total  = chroms.length;
+
+    // Build placeholder grid first (all pending)
+    ChromScanner._buildGrid(chroms, -1);
+
+    // Animate through each chromosome one by one
+    for (let i = 0; i < total; i++) {
+      const c = chroms[i];
+      const p = Math.round(((i + 1) / total) * 100);
+
+      bar.style.width   = p + '%';
+      pct.textContent   = p + '%';
+      label.textContent = `Checking chromosome ${c.display} — ${c.snp_count.toLocaleString()} SNPs`;
+
+      // Mark current as scanning, previous as done
+      if (i > 0) ChromScanner._setDone(chroms[i - 1], i - 1);
+      ChromScanner._setScanning(c, i);
+
+      await ChromScanner._delay(i < 22 ? 180 : 260);  // slight pause for sex/MT chroms
+    }
+
+    // Mark last as done
+    ChromScanner._setDone(chroms[total - 1], total - 1);
+
+    // Final summary
+    const wTotal = chroms.reduce((s, c) => s + c.wellness_hits, 0);
+    const dTotal = chroms.reduce((s, c) => s + c.drug_hits, 0);
+    const found  = chroms.filter(c => c.has_findings).length;
+    label.textContent = `✅ Complete — ${found} chromosomes with findings`;
+    bar.style.width = '100%';
+    pct.textContent = '100%';
+
+    document.getElementById('chrom-scan-summary').innerHTML =
+      `<strong>${data.total_snps.toLocaleString()}</strong> SNPs across <strong>${total}</strong> chromosomal strands &nbsp;·&nbsp;` +
+      `<span style="color:#6366f1"><strong>${wTotal}</strong> wellness</span> &nbsp;·&nbsp;` +
+      `<span style="color:#f59e0b"><strong>${dTotal}</strong> drug matches</span>`;
+
+    btn.disabled = false;
+    btn.textContent = '🔬 Re-scan';
+  },
+
+  _delay(ms) { return new Promise(r => setTimeout(r, ms)); },
+
+  _buildGrid(chroms, activeIdx) {
+    const grid = document.getElementById('chrom-grid');
+    grid.innerHTML = chroms.map((c, i) => `
+      <div class="chrom-block pending" id="cb-${i}" title="Chromosome ${c.display}: ${c.snp_count.toLocaleString()} SNPs">
+        <div class="chrom-scan-line"></div>
+        <div class="chrom-name">chr${c.display}</div>
+        <div class="chrom-snp-count">${c.snp_count.toLocaleString()} SNPs</div>
+        <div class="chrom-badges" id="cbadge-${i}"></div>
+      </div>
+    `).join('');
+  },
+
+  _setScanning(c, i) {
+    const el = document.getElementById(`cb-${i}`);
+    if (!el) return;
+    el.className = 'chrom-block scanning';
+  },
+
+  _setDone(c, i) {
+    const el    = document.getElementById(`cb-${i}`);
+    const badge = document.getElementById(`cbadge-${i}`);
+    if (!el) return;
+
+    let cls = 'chrom-block done-none';
+    let badges = '';
+
+    if (c.wellness_hits > 0 && c.drug_hits > 0) {
+      cls = 'chrom-block done-both';
+      badges = `<span class="chrom-badge chrom-badge-w">W ${c.wellness_hits}</span><span class="chrom-badge chrom-badge-d">D ${c.drug_hits}</span>`;
+    } else if (c.wellness_hits > 0) {
+      cls = 'chrom-block done-findings';
+      badges = `<span class="chrom-badge chrom-badge-w">W ${c.wellness_hits}</span>`;
+    } else if (c.drug_hits > 0) {
+      cls = 'chrom-block done-drugs';
+      badges = `<span class="chrom-badge chrom-badge-d">D ${c.drug_hits}</span>`;
+    }
+
+    el.className = cls;
+    if (badge) badge.innerHTML = badges;
+  },
+
+  // Auto-start when section is opened and profile is loaded
+  init() {
+    const section = document.getElementById('chrom-scanner-section');
+    if (!section) return;
+    section.addEventListener('toggle', () => {
+      if (section.open && ChromScanner._data === null) {
+        // Only auto-scan if a profile is loaded
+        apiFetch('/api/profile').then(() => ChromScanner.start()).catch(() => {});
+      }
+    });
+  },
+};
+
+// ════════════════════════════════════════════════════════════════
+//  MICROBIOME UI
+// ════════════════════════════════════════════════════════════════
+const MicrobiomeUI = {
+
+  CATEGORY_COLORS: {
+    scfa:               { color: '#22c55e', bg: '#dcfce7' },
+    gut_energy:         { color: '#3b82f6', bg: '#dbeafe' },
+    gut_brain:          { color: '#8b5cf6', bg: '#ede9fe' },
+    vitamins:           { color: '#06b6d4', bg: '#cffafe' },
+    inflammation:       { color: '#f43f5e', bg: '#fee2e2' },
+    amino_acids:        { color: '#f59e0b', bg: '#fef3c7' },
+    fibre_fermentation: { color: '#84cc16', bg: '#ecfccb' },
+    other:              { color: '#6b7280', bg: '#f3f4f6' },
+  },
+
+  CATEGORY_LABELS: {
+    scfa:               'Short-Chain Fatty Acids',
+    gut_energy:         'Gut Energy',
+    gut_brain:          'Gut-Brain Axis',
+    vitamins:           'Vitamin Biosynthesis',
+    inflammation:       'Inflammation',
+    amino_acids:        'Amino Acids',
+    fibre_fermentation: 'Fibre Fermentation',
+    other:              'Other',
+  },
+
+  async upload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const status = document.getElementById('microbiome-upload-status');
+    status.textContent = 'Uploading…';
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const resp = await fetch('/api/microbiome/upload', { method: 'POST', body: fd });
+      if (!resp.ok) {
+        const err = await resp.json();
+        status.textContent = '❌ ' + (err.detail || 'Upload failed');
+        return;
+      }
+      const data = await resp.json();
+      status.textContent = `✅ Loaded ${data.total_pathways} pathways`;
+      await MicrobiomeUI.load(data.session_id, file.name);
+    } catch (e) {
+      status.textContent = '❌ ' + e.message;
+    }
+  },
+
+  async load(sessionId, filename) {
+    const resp = await apiFetch('/api/microbiome' + (sessionId ? `?session_id=${sessionId}` : ''));
+    if (!resp || resp.error) return;
+    MicrobiomeUI.render(resp, filename);
+  },
+
+  render(data, filename) {
+    document.getElementById('microbiome-upload-area').style.display = 'none';
+    const results = document.getElementById('microbiome-results');
+    results.style.display = 'block';
+
+    const notable = data.notable || [];
+    document.getElementById('mb-pathway-count').textContent = data.pathways.length;
+    if (filename) document.getElementById('mb-filename').textContent = filename;
+
+    const grid = document.getElementById('microbiome-card-grid');
+    if (!notable.length) {
+      grid.innerHTML = '<p style="color:#64748b;font-size:0.85rem">No annotated pathways detected. Check that your file is a HUMAnN *_pathabundance.tsv.</p>';
+      return;
+    }
+
+    // Find max pct for bar scaling
+    const maxPct = Math.max(...notable.map(p => p.relative_pct || 0)) || 1;
+
+    grid.innerHTML = notable.map(p => MicrobiomeUI.buildCard(p, maxPct)).join('');
+
+    // Animate bars
+    requestAnimationFrame(() => {
+      grid.querySelectorAll('.mb-card-bar-fill').forEach(el => {
+        el.style.width = el.dataset.pct + '%';
+      });
+    });
+  },
+
+  buildCard(p, maxPct) {
+    const cat   = p.health_category || 'other';
+    const meta  = MicrobiomeUI.CATEGORY_COLORS[cat] || MicrobiomeUI.CATEGORY_COLORS.other;
+    const label = MicrobiomeUI.CATEGORY_LABELS[cat] || cat;
+    const sig   = p.health_signal || 'normal';
+    const barW  = Math.round((p.relative_pct / maxPct) * 100);
+    const pctFmt = p.relative_pct < 0.01 ? '<0.01%' : p.relative_pct.toFixed(2) + '%';
+    const sigClass = {
+      high: 'mb-signal-high', normal: 'mb-signal-normal',
+      low: 'mb-signal-low', absent: 'mb-signal-absent', elevated: 'mb-signal-elevated',
+    }[sig] || 'mb-signal-normal';
+    const sigLabel = { high: '↑ High', normal: 'Normal', low: '↓ Low', absent: 'Absent', elevated: '⚠ Elevated' }[sig] || sig;
+
+    return `<div class="mb-card" style="border-left-color:${meta.color}">
+      <div class="mb-card-header">
+        <span class="mb-card-icon">${p.icon || '🧫'}</span>
+        <span class="mb-card-label">${p.pathway_name || p.pathway_id}</span>
+        <span class="mb-card-category" style="background:${meta.bg};color:${meta.color}">${label}</span>
+      </div>
+      <div class="mb-card-plain">${p.plain_english || ''}</div>
+      <div class="mb-card-bar-wrap">
+        <div class="mb-card-bar-bg">
+          <div class="mb-card-bar-fill" style="background:${meta.color};width:0%" data-pct="${barW}"></div>
+        </div>
+        <span class="mb-card-pct">${pctFmt}</span>
+        <span class="mb-signal-badge ${sigClass}">${sigLabel}</span>
+      </div>
+    </div>`;
+  },
+};
 </script>
 </body>
 </html>

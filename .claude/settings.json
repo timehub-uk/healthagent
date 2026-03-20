@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; case \"$f\" in *.py) python3 -m py_compile \"$f\" 2>&1 && echo \"[syntax-check] OK: $f\" || echo \"[syntax-check] FAIL: $f\";; *) true;; esac; } 2>/dev/null || true",
+            "statusMessage": "Checking Python syntax..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/gitmaster/healthagent && find . -name '*.py' -not -path './.git/*' -not -path './venv/*' | sort | xargs -I{} sh -c 'python3 -m py_compile \"{}\" 2>&1 || echo \"SYNTAX ERROR: {}\"' 2>/dev/null | grep -E 'SYNTAX ERROR' | head -20 || true",
+            "statusMessage": "Running startup syntax check on all Python files..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Context is about to be compacted because it's nearly full. Before compacting: (1) Save any critical in-progress work state to /home/gitmaster/healthagent/.claude/compact-checkpoint.md — list what was being worked on, what files were changed, what's pending, and what the next steps are. (2) Run python3 -m py_compile on any recently edited .py files. (3) Output a brief summary of what to preserve so the next session can resume cleanly.",
+            "statusMessage": "Saving checkpoint before context compact...",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "You are a memory-writing agent for the healthagent project at /home/gitmaster/healthagent. Your job is to capture important information from this session and persist it as structured markdown memory files.\n\nMemory directory: /root/.claude/projects/-home-gitmaster-claude-ai/memory/\nMemory index: /root/.claude/projects/-home-gitmaster-claude-ai/memory/MEMORY.md\n\nSteps:\n1. Read the existing MEMORY.md index to understand what memories already exist.\n2. Review what happened this session — files created or edited, bugs fixed, decisions made, user preferences shown, architectural choices, pending tasks.\n3. For each piece of important information, decide if it updates an existing memory or needs a new one. Categories:\n   - user_*.md     → user preferences, skill level, working style\n   - feedback_*.md → corrections or guidance the user gave\n   - project_*.md  → project state, what's built, what's pending, key decisions\n   - reference_*.md → external resources, APIs, URLs that matter\n4. Write or update the relevant memory files with this frontmatter format:\n   ---\n   name: <short name>\n   description: <one-line description for relevance matching>\n   type: <user|feedback|project|reference>\n   ---\n   <content — for feedback/project include Why: and How to apply: lines>\n5. Update MEMORY.md index to include any new files. Keep the index under 200 lines.\n6. Do NOT write memories about: code patterns derivable from reading files, git history, temporary session state, or things already in CLAUDE.md.\n\nFocus on information that will help future sessions work better — decisions, preferences, gotchas, pending work, and important project context.",
+            "statusMessage": "Saving session memory...",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

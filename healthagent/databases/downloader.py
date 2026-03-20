@@ -44,8 +44,9 @@ log = logging.getLogger(__name__)
 CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "cache"
 
 # ── Source URLs ───────────────────────────────────────────────────
+# GWAS Catalog — full associations ZIP from EBI FTP (old API endpoint is dead)
 GWAS_ASSOCIATIONS_URL = (
-    "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative"
+    "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations-full.zip"
 )
 CLINVAR_VARIANT_SUMMARY_URL = (
     "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz"
@@ -58,8 +59,9 @@ PHARMGKB_VARIANTS_URL = (
 )
 
 # DisGeNET — gene-disease associations (all sources, CC BY-NC-SA 4.0)
+# Note: disgenet.org moved; use the new disgenet.com download URL
 DISGENET_ALL_URL = (
-    "https://www.disgenet.org/static/disgenet_ap1/files/downloads/all_gene_disease_associations.tsv.gz"
+    "https://www.disgenet.com/static/disgenet_ap1/files/downloads/all_gene_disease_associations.tsv.gz"
 )
 
 # OpenTargets — overall association scores (Apache 2.0, Parquet/JSON)
@@ -77,8 +79,8 @@ FINNGEN_MANIFEST_URL = (
 ENSEMBL_REST_BASE = "https://rest.ensembl.org"
 
 
-def _fetch(url: str, label: str, cache_name: str) -> Path:
-    """Download url to cache, returning path. Re-uses cached file if <24h old."""
+def _fetch(url: str, label: str, cache_name: str, progress_cb=None) -> Path:
+    """Download url to cache via streaming, returning path. Re-uses cached file if <24h old."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     dest = CACHE_DIR / cache_name
     if dest.exists():
@@ -88,10 +90,22 @@ def _fetch(url: str, label: str, cache_name: str) -> Path:
             return dest
     log.info(f"[{label}] Downloading from {url}")
     req = urllib.request.Request(url, headers={"User-Agent": "HealthAgent/1.0"})
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = resp.read()
-    dest.write_bytes(data)
-    log.info(f"[{label}] Saved {len(data):,} bytes → {dest}")
+    chunk_size = 1024 * 1024  # 1 MB chunks
+    downloaded = 0
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        total = int(resp.headers.get("Content-Length", 0))
+        with open(dest, "wb") as out:
+            while True:
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
+                out.write(chunk)
+                downloaded += len(chunk)
+                if progress_cb and total:
+                    pct = downloaded * 100 // total
+                    if downloaded % (10 * chunk_size) < chunk_size:
+                        progress_cb(f"[{label}] Downloaded {downloaded/1e6:.1f}/{total/1e6:.1f} MB ({pct}%)...")
+    log.info(f"[{label}] Saved {downloaded:,} bytes → {dest}")
     return dest
 
 
@@ -123,18 +137,20 @@ def download_gwas(progress_cb: Callable[[str], None] = print) -> int:
         Number of association records inserted.
     """
     log_id = local_db.log_download("gwas_catalog", "started")
-    progress_cb("[GWAS] Starting download from EBI GWAS Catalog...")
+    progress_cb("[GWAS] Starting download from EBI GWAS Catalog FTP...")
 
     try:
-        path = _fetch(GWAS_ASSOCIATIONS_URL, "GWAS", "gwas_associations.tsv")
+        path = _fetch(GWAS_ASSOCIATIONS_URL, "GWAS", "gwas_associations.zip", progress_cb)
     except Exception as e:
         local_db.log_download("gwas_catalog", "failed", error=str(e))
         progress_cb(f"[GWAS] Download failed: {e}")
         return 0
 
-    progress_cb("[GWAS] Parsing associations...")
+    progress_cb("[GWAS] Parsing associations from ZIP...")
 
-    # Columns in GWAS alternative download TSV:
+    import zipfile
+
+    # GWAS Catalog full associations ZIP contains a TSV with columns:
     # DATE ADDED TO CATALOG, PUBMEDID, FIRST AUTHOR, DATE, JOURNAL, LINK,
     # STUDY, DISEASE/TRAIT, INITIAL SAMPLE SIZE, REPLICATION SAMPLE SIZE,
     # REGION, CHR_ID, CHR_POS, REPORTED GENE(S), MAPPED_GENE, UPSTREAM_GENE_ID,
@@ -148,30 +164,26 @@ def download_gwas(progress_cb: Callable[[str], None] = print) -> int:
     snps_to_insert = []
     count = 0
 
-    with _open_maybe_gz(path) as f:
+    def _parse_gwas_tsv(f):
+        nonlocal count
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
             rsid_raw = row.get("SNPS", "").strip()
             if not rsid_raw or not rsid_raw.startswith("rs"):
                 continue
-
             trait = row.get("DISEASE/TRAIT", "").strip()
             if not trait:
                 continue
-
             try:
                 p_val = float(row.get("P-VALUE", "") or 0)
             except ValueError:
                 p_val = None
-
             try:
                 or_beta = float(row.get("OR or BETA", "") or 0)
             except ValueError:
                 or_beta = None
-
             risk_allele_full = row.get("STRONGEST SNP-RISK ALLELE", "")
             risk_allele = risk_allele_full.split("-")[-1] if "-" in risk_allele_full else risk_allele_full
-
             mapped_trait = row.get("MAPPED_TRAIT", "").strip()
             trait_uri    = row.get("MAPPED_TRAIT_URI", "").strip()
             efo_id       = trait_uri.split("/")[-1] if "/" in trait_uri else trait_uri
@@ -179,12 +191,10 @@ def download_gwas(progress_cb: Callable[[str], None] = print) -> int:
             study_title  = row.get("STUDY", "").strip()
             gene         = row.get("MAPPED_GENE", "").strip()
             chrom        = row.get("CHR_ID", "").strip()
-
             try:
                 pos = int(row.get("CHR_POS", "") or 0)
             except ValueError:
                 pos = 0
-
             snps_to_insert.append((rsid_raw, chrom, pos, gene))
             rows_to_insert.append((
                 rsid_raw, mapped_trait or trait, efo_id,
@@ -193,9 +203,25 @@ def download_gwas(progress_cb: Callable[[str], None] = print) -> int:
                 study_title, pubmed_id,
             ))
             count += 1
-
             if count % 10000 == 0:
                 progress_cb(f"[GWAS] Parsed {count:,} records...")
+
+    try:
+        with zipfile.ZipFile(path) as zf:
+            tsv_name = next(
+                (n for n in zf.namelist() if n.endswith(".tsv") and "association" in n.lower()),
+                None,
+            ) or next((n for n in zf.namelist() if n.endswith(".tsv")), None)
+            if tsv_name:
+                progress_cb(f"[GWAS] Extracting {tsv_name} from ZIP...")
+                with zf.open(tsv_name) as raw:
+                    _parse_gwas_tsv(io.TextIOWrapper(raw, encoding="utf-8", errors="replace"))
+            else:
+                raise ValueError("No TSV found in GWAS ZIP")
+    except zipfile.BadZipFile:
+        # Fallback: treat as plain TSV (old format)
+        with _open_maybe_gz(path) as f:
+            _parse_gwas_tsv(f)
 
     progress_cb(f"[GWAS] Inserting {len(snps_to_insert):,} SNP records...")
     local_db.executemany(
@@ -241,7 +267,7 @@ def download_clinvar(progress_cb: Callable[[str], None] = print) -> int:
     progress_cb("[ClinVar] Starting download from NCBI FTP...")
 
     try:
-        path = _fetch(CLINVAR_VARIANT_SUMMARY_URL, "ClinVar", "variant_summary.txt.gz")
+        path = _fetch(CLINVAR_VARIANT_SUMMARY_URL, "ClinVar", "variant_summary.txt.gz", progress_cb)
     except Exception as e:
         local_db.log_download("clinvar", "failed", error=str(e))
         progress_cb(f"[ClinVar] Download failed: {e}")

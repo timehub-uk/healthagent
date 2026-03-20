@@ -165,6 +165,32 @@ CREATE TABLE IF NOT EXISTS biobank_phenotype (
     downloaded_at   TEXT DEFAULT (datetime('now'))
 );
 
+-- ── HUMAnN microbiome pathway abundances ─────────────────────────
+-- Accepts output from HUMAnN 3.x _pathabundance.tsv files
+-- Community-level rows only (species-stratified rows are skipped)
+CREATE TABLE IF NOT EXISTS microbiome_pathway (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      TEXT NOT NULL,      -- upload session identifier (timestamp)
+    pathway_id      TEXT NOT NULL,      -- MetaCyc ID e.g. GLYCOLYSIS-PWY
+    pathway_name    TEXT,               -- human-readable name from HUMAnN
+    abundance_rpk   REAL DEFAULT 0,     -- raw RPK value from file
+    relative_pct    REAL DEFAULT 0,     -- % of total mapped abundance
+    health_category TEXT,               -- gut_energy, scfa, vitamins, etc.
+    plain_english   TEXT,               -- consumer-friendly explanation
+    health_signal   TEXT DEFAULT 'normal', -- high, normal, low, absent
+    icon            TEXT,               -- emoji
+    uploaded_at     TEXT DEFAULT (datetime('now')),
+    UNIQUE(session_id, pathway_id)
+);
+CREATE TABLE IF NOT EXISTS microbiome_session (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id      TEXT UNIQUE NOT NULL,
+    filename        TEXT,
+    total_pathways  INTEGER DEFAULT 0,
+    mapped_rpk      REAL DEFAULT 0,
+    uploaded_at     TEXT DEFAULT (datetime('now'))
+);
+
 -- ── Indexes ───────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_gwas_rsid         ON gwas_association(rsid);
 CREATE INDEX IF NOT EXISTS idx_gwas_trait        ON gwas_association(trait);
@@ -178,3 +204,6 @@ CREATE INDEX IF NOT EXISTS idx_disgenet_disease  ON disgenet_association(disease
 CREATE INDEX IF NOT EXISTS idx_opentargets_gene  ON opentargets_association(gene_symbol);
 CREATE INDEX IF NOT EXISTS idx_ensembl_rsid      ON ensembl_consequence(rsid);
 CREATE INDEX IF NOT EXISTS idx_biobank_rsid      ON biobank_phenotype(rsid);
+CREATE INDEX IF NOT EXISTS idx_microbiome_session  ON microbiome_pathway(session_id);
+CREATE INDEX IF NOT EXISTS idx_microbiome_pathway  ON microbiome_pathway(pathway_id);
+CREATE INDEX IF NOT EXISTS idx_microbiome_category ON microbiome_pathway(health_category);

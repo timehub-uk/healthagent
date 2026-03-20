@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from healthagent.databases import local_db
+from healthagent.databases.tcga_client import get_cached_tcga, query_tcga_for_rsids
 
 if TYPE_CHECKING:
     from healthagent.dna_importer import DNAProfile
@@ -75,10 +76,17 @@ def analyze_profile(profile: "DNAProfile") -> dict:
     gwas_rows = local_db.get_gwas_associations(rsid_list, limit=3)
     gwas = []
     for row in gwas_rows:
+        trait_name = row.get("trait") or row.get("trait_name") or ""
+        if not trait_name:
+            continue  # skip unknown/empty GWAS records
         gwas.append({
             **row,
-            "p_value_fmt": _fmt_pval(row.get("p_value")),
-            "or_fmt":      _fmt_or(row.get("odds_ratio")),
+            "trait_name":   trait_name,
+            "category":     "gwas",
+            "detail":       f"{row.get('study_title', '')} (p={_fmt_pval(row.get('p_value'))})",
+            "your_result":  f"OR: {_fmt_or(row.get('odds_ratio'))}  Risk allele: {row.get('risk_allele', '—')}",
+            "p_value_fmt":  _fmt_pval(row.get("p_value")),
+            "or_fmt":       _fmt_or(row.get("odds_ratio")),
         })
 
     # ── ClinVar ───────────────────────────────────────────────────
@@ -86,10 +94,19 @@ def analyze_profile(profile: "DNAProfile") -> dict:
     clinvar = []
     for row in clinvar_rows:
         sig = row.get("clinical_sig", "")
+        condition = row.get("condition") or ""
+        gene = row.get("gene") or ""
+        trait_name = condition.split(";")[0].strip() if condition else (gene or "")
+        if not trait_name:
+            continue  # skip empty ClinVar records
         clinvar.append({
             **row,
+            "trait_name":        trait_name,
+            "category":          "clinvar",
+            "your_result":       _clinvar_plain(sig),
+            "detail":            condition,
             "plain_significance": _clinvar_plain(sig),
-            "severity_color":     _clinvar_color(sig),
+            "severity_color":    _clinvar_color(sig),
         })
 
     # ── Gather gene names from all sources ────────────────────────
@@ -99,18 +116,28 @@ def analyze_profile(profile: "DNAProfile") -> dict:
         "SELECT DISTINCT gene FROM wellness_trait WHERE gene IS NOT NULL AND gene != ''"
     )
     genes = list({r["gene"] for r in wt_genes})
-    # Also from snp table if populated
+    # Also from snp table if populated (snp table is small — only tracked rsids)
     if rsid_list:
-        ph = ",".join("?" * len(rsid_list))
         snp_genes = local_db.query(
-            f"SELECT DISTINCT gene FROM snp WHERE rsid IN ({ph}) AND gene != ''",
-            tuple(rsid_list),
+            "SELECT DISTINCT gene FROM snp WHERE gene IS NOT NULL AND gene != ''"
         )
         genes = list(set(genes) | {r["gene"] for r in snp_genes if r["gene"]})
 
     # ── Drug interactions ─────────────────────────────────────────
     drug_rows = local_db.get_drug_interactions(rsids=rsid_list, genes=genes)
-    drugs = [dict(r) for r in drug_rows]
+    drugs = []
+    for row in drug_rows:
+        drug_name = row.get("drug_name") or ""
+        if not drug_name:
+            continue
+        gene = row.get("gene") or ""
+        drugs.append({
+            **row,
+            "trait_name": f"{drug_name}" + (f" ({gene})" if gene else ""),
+            "category":   "medications",
+            "your_result": row.get("phenotype") or "",
+            "detail":      row.get("plain_english") or row.get("phenotype") or "",
+        })
 
     # ── DisGeNET gene-disease associations ────────────────────────
     disgenet_rows = local_db.get_disgenet_diseases(genes, min_score=0.3)
@@ -134,6 +161,9 @@ def analyze_profile(profile: "DNAProfile") -> dict:
     biobank_rows = local_db.get_biobank_phenotypes(rsid_list)
     biobank = [dict(r) for r in biobank_rows]
 
+    # ── TCGA cancer mutation context (cached, per-user SNPs only) ─
+    tcga = get_cached_tcga(rsid_list)
+
     # ── Summary ───────────────────────────────────────────────────
     cat_counts: dict[str, int] = {}
     for w in wellness:
@@ -147,6 +177,7 @@ def analyze_profile(profile: "DNAProfile") -> dict:
         "gwas_found":        len(gwas),
         "clinvar_found":     len(clinvar),
         "drugs_found":       len(drugs),
+        "tcga_found":        len(tcga),
         "worth_noting":      worth_noting,
         "category_counts":   cat_counts,
         "db_stats":          local_db.get_db_stats(),
@@ -161,6 +192,7 @@ def analyze_profile(profile: "DNAProfile") -> dict:
         "opentargets": opentargets,
         "ensembl":     ensembl,
         "biobank":     biobank,
+        "tcga":        tcga,
         "summary":     summary,
     }
 
