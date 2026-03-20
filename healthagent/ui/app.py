@@ -733,3 +733,265 @@ async def get_microbiome_sessions():
     """List all microbiome upload sessions."""
     _touch_last_use()
     return {"sessions": list_sessions()}
+
+
+# ── Physical / appearance traits derived from known SNPs ──────────
+_PHYSICAL_TRAIT_RSIDS: dict[str, dict] = {
+    # Eye colour
+    "rs12913832": {
+        "trait": "Eye Colour",
+        "icon": "👁️",
+        "category": "appearance",
+        "gene": "HERC2/OCA2",
+        "body_part": "👁️ Eyes",
+        "what_it_means": (
+            "The HERC2 gene controls how much OCA2 protein is made in your iris. "
+            "OCA2 produces the pigment eumelanin — more of it means darker (brown) eyes, "
+            "less means lighter (blue or green) eyes. This SNP is the strongest single "
+            "predictor of eye colour identified by genome-wide studies."
+        ),
+        "interpret": lambda g: (
+            ("Likely blue or green eyes", "blue")   if "AA" in g else
+            ("Likely brown or hazel eyes", "brown") if "GG" in g else
+            ("Mixed — hazel or green likely", "hazel")
+        ),
+    },
+    "rs1800407": {
+        "trait": "Eye Colour (OCA2 modifier)",
+        "icon": "👁️",
+        "category": "appearance",
+        "gene": "OCA2",
+        "body_part": "👁️ Eyes",
+        "what_it_means": (
+            "A second OCA2 variant that can independently reduce iris pigmentation. "
+            "Carrying the T allele tends to lighten eye colour, particularly shifting "
+            "brown eyes toward hazel or green."
+        ),
+        "interpret": lambda g: (
+            ("OCA2 variant — may lighten eye colour", "light") if "T" in g else
+            ("Standard OCA2 — no lightening effect", "standard")
+        ),
+    },
+    # Hair colour
+    "rs1805007": {
+        "trait": "Red Hair Tendency",
+        "icon": "🦰",
+        "category": "appearance",
+        "gene": "MC1R",
+        "body_part": "🧑 Hair & Skin",
+        "what_it_means": (
+            "The MC1R gene encodes the melanocortin-1 receptor, which switches melanocytes "
+            "between making dark eumelanin (brown/black) and red pheomelanin. "
+            "The rs1805007 T allele reduces receptor activity, dramatically increasing "
+            "pheomelanin and producing red or auburn hair. It also reduces UV protection, "
+            "increasing sunburn risk — use SPF daily."
+        ),
+        "interpret": lambda g: (
+            ("Strong red-hair variant (MC1R)", "red") if "TT" in g else
+            ("One copy of red-hair MC1R variant", "auburn") if "T" in g else
+            ("No red-hair MC1R variant", "none")
+        ),
+    },
+    "rs1805008": {
+        "trait": "Red Hair (MC1R variant 2)",
+        "icon": "🦰",
+        "category": "appearance",
+        "gene": "MC1R",
+        "body_part": "🧑 Hair & Skin",
+        "what_it_means": (
+            "A second loss-of-function MC1R variant associated with red or auburn hair, "
+            "fair skin, and increased sensitivity to sunlight. Combined with rs1805007, "
+            "both copies significantly elevate melanoma risk compared to non-carriers."
+        ),
+        "interpret": lambda g: (
+            ("MC1R variant — linked to red or auburn hair", "red") if "A" in g else
+            ("No second MC1R red-hair variant", "none")
+        ),
+    },
+    # Lactose tolerance
+    "rs4988235": {
+        "trait": "Lactose Tolerance",
+        "icon": "🥛",
+        "category": "digestion",
+        "gene": "LCT",
+        "body_part": "🫀 Digestive System",
+        "what_it_means": (
+            "Most mammals lose the ability to digest lactose (milk sugar) after weaning. "
+            "In some human populations, a mutation near the LCT gene keeps the lactase "
+            "enzyme active into adulthood. The G allele at rs4988235 is the European "
+            "lactase-persistence variant. Without it, undigested lactose reaches the colon "
+            "where bacteria ferment it, causing bloating, gas, and diarrhoea."
+        ),
+        "interpret": lambda g: (
+            ("Lactose tolerant — LCT gene stays active", "tolerant") if "G" in g else
+            ("Likely lactose intolerant in adulthood", "intolerant")
+        ),
+    },
+    # Caffeine metabolism
+    "rs762551": {
+        "trait": "Caffeine Metabolism",
+        "icon": "☕",
+        "category": "metabolism",
+        "gene": "CYP1A2",
+        "body_part": "🫀 Liver",
+        "what_it_means": (
+            "CYP1A2 is the liver enzyme responsible for breaking down about 95% of caffeine. "
+            "The rs762551 A allele produces a faster enzyme. Fast metabolisers can drink coffee "
+            "later in the day with less sleep disruption, while slow metabolisers may feel "
+            "jitteriness, anxiety, or insomnia even from moderate amounts. Studies also link "
+            "slow CYP1A2 to higher heart disease risk with heavy coffee intake."
+        ),
+        "interpret": lambda g: (
+            ("Fast caffeine metaboliser (CYP1A2)", "fast") if "AA" in g else
+            ("Slow caffeine metaboliser — sensitivity likely", "slow")
+        ),
+    },
+    # Earwax type
+    "rs17822931": {
+        "trait": "Earwax Type",
+        "icon": "👂",
+        "category": "traits",
+        "gene": "ABCC11",
+        "body_part": "👂 Ears & Sweat Glands",
+        "what_it_means": (
+            "ABCC11 encodes a transporter that secretes fatty compounds into ear-canal glands. "
+            "The wet form (C or T allele) produces sticky, yellow earwax; the dry form (TT) "
+            "produces grey, flaky wax common in East Asian populations. "
+            "Interestingly, this same gene also affects body-odour intensity — dry-earwax carriers "
+            "produce significantly less underarm odour."
+        ),
+        "interpret": lambda g: (
+            ("Dry earwax (East Asian variant)", "dry") if "TT" in g else
+            ("Wet earwax (typical)", "wet")
+        ),
+    },
+    # Muscle composition
+    "rs1815739": {
+        "trait": "Muscle Fibre Type",
+        "icon": "💪",
+        "category": "fitness",
+        "gene": "ACTN3",
+        "body_part": "💪 Skeletal Muscle",
+        "what_it_means": (
+            "Alpha-actinin-3 (encoded by ACTN3) is a structural protein found only in fast-twitch "
+            "(type II) muscle fibres used for explosive power. The CC genotype produces functional "
+            "ACTN3 — associated with sprint and power performance. The TT genotype creates a "
+            "non-functional protein; the body compensates with more efficient slow-twitch fibres, "
+            "favouring endurance sports. About 18% of the global population is TT."
+        ),
+        "interpret": lambda g: (
+            ("Power-oriented muscle fibres (ACTN3 CC)", "power")    if "CC" in g else
+            ("Endurance-oriented muscle fibres (ACTN3 TT)", "endurance") if "TT" in g else
+            ("Mixed muscle fibre type", "mixed")
+        ),
+    },
+    # Bitter taste perception
+    "rs713598": {
+        "trait": "Bitter Taste Perception",
+        "icon": "👅",
+        "category": "traits",
+        "gene": "TAS2R38",
+        "body_part": "👅 Taste Buds & Tongue",
+        "what_it_means": (
+            "TAS2R38 encodes a bitter taste receptor that detects compounds like PTC and PROP, "
+            "found in cruciferous vegetables (broccoli, Brussels sprouts, kale). "
+            "Supertasters (GG) find these very bitter and often eat fewer vegetables, "
+            "which may affect cancer-protective nutrient intake. Non-tasters (CC) may use "
+            "more salt to compensate for blander food perception."
+        ),
+        "interpret": lambda g: (
+            ("Supertaster — very sensitive to bitter foods", "supertaster") if "GG" in g else
+            ("Non-taster — low bitter sensitivity", "nontaster")   if "CC" in g else
+            ("Average bitter taste sensitivity", "average")
+        ),
+    },
+    # Skin / UV sensitivity (SLC24A5)
+    "rs1426654": {
+        "trait": "Skin Pigmentation",
+        "icon": "🌞",
+        "category": "appearance",
+        "gene": "SLC24A5",
+        "body_part": "🧑 Skin",
+        "what_it_means": (
+            "SLC24A5 encodes a calcium transporter in melanosomes (pigment-producing organelles). "
+            "The A allele (common in Europeans) reduces melanin production, resulting in lighter skin "
+            "that is more efficient at synthesising vitamin D in low-sunlight environments but burns "
+            "more easily. The G allele (common in Africans and South Asians) produces more melanin, "
+            "offering better natural UV protection."
+        ),
+        "interpret": lambda g: (
+            ("Lighter skin pigmentation (SLC24A5 AA)", "light") if "AA" in g else
+            ("Darker skin pigmentation (SLC24A5 GG)", "dark")   if "GG" in g else
+            ("Intermediate skin pigmentation", "medium")
+        ),
+    },
+    # Alcohol flush
+    "rs671": {
+        "trait": "Alcohol Flush Reaction",
+        "icon": "🍷",
+        "category": "metabolism",
+        "gene": "ALDH2",
+        "body_part": "🫀 Liver & Blood Vessels",
+        "what_it_means": (
+            "ALDH2 breaks down acetaldehyde, the toxic by-product of alcohol metabolism. "
+            "The A allele creates a near-non-functional ALDH2 enzyme common in East Asians (~35-40%). "
+            "Acetaldehyde builds up, causing facial flushing, rapid heartbeat, nausea, and headache "
+            "(the 'Asian flush'). ALDH2 deficiency also significantly increases oesophageal cancer "
+            "risk with regular alcohol consumption — the WHO classifies acetaldehyde as a Group 1 carcinogen."
+        ),
+        "interpret": lambda g: (
+            ("Strong flush reaction (ALDH2 deficiency)", "flush") if "AA" in g else
+            ("Mild flush tendency (ALDH2 heterozygous)", "mild")  if "A" in g else
+            ("No typical flush reaction", "none")
+        ),
+    },
+    # Deep sleep / melatonin
+    "rs57875989": {
+        "trait": "Sleep Duration Tendency",
+        "icon": "🌙",
+        "category": "sleep",
+        "gene": "ADRB1",
+        "body_part": "🧠 Brain & Nervous System",
+        "what_it_means": (
+            "ADRB1 encodes the beta-1 adrenergic receptor involved in regulating arousal and sleep. "
+            "A rare variant (A allele) identified in naturally short sleepers allows individuals to "
+            "function well on 6 hours or less without apparent cognitive impairment. Most people with "
+            "typical genetics need 7–9 hours; chronically sleeping less increases cardiovascular and "
+            "metabolic risk regardless of how rested you feel."
+        ),
+        "interpret": lambda g: (
+            ("Genetic short-sleep variant (ADRB1)", "short") if "A" in g else
+            ("Typical sleep duration genetics", "typical")
+        ),
+    },
+}
+
+
+@app.get("/api/physical_traits")
+async def get_physical_traits():
+    """Return DNA-derived physical and appearance trait predictions."""
+    _touch_last_use()
+    if _profile is None:
+        return {"traits": [], "available": False}
+
+    geno_map = {s.rsid: s.genotype.upper() for s in _profile.snps}
+    results = []
+    for rsid, meta in _PHYSICAL_TRAIT_RSIDS.items():
+        genotype = geno_map.get(rsid)
+        if genotype is None:
+            continue
+        label, value_key = meta["interpret"](genotype)
+        results.append({
+            "rsid":          rsid,
+            "trait":         meta["trait"],
+            "icon":          meta["icon"],
+            "category":      meta["category"],
+            "gene":          meta.get("gene", ""),
+            "genotype":      genotype,
+            "result":        label,
+            "value_key":     value_key,
+            "what_it_means": meta.get("what_it_means", ""),
+            "body_part":     meta.get("body_part", ""),
+        })
+
+    return {"traits": results, "available": True}

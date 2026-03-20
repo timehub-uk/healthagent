@@ -242,6 +242,177 @@ body {
   font-weight: 600;
 }
 
+/* ── Severity sub-bar ──────────────────────────────────────── */
+#severity-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 1.5rem 0.6rem;
+  flex-wrap: wrap;
+}
+.severity-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-right: 0.25rem;
+}
+.sev-pill {
+  flex-shrink: 0;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted2);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sev-pill:hover { border-color: var(--accent1); color: var(--text); }
+.sev-pill[data-sev="high"].active   { background:rgba(244,63,94,0.15);  border-color:#f43f5e; color:#fb7185; }
+.sev-pill[data-sev="medium"].active { background:rgba(245,158,11,0.15); border-color:#f59e0b; color:#fbbf24; }
+.sev-pill[data-sev="low"].active    { background:rgba(34,197,94,0.15);  border-color:#22c55e; color:#4ade80; }
+.sev-pill[data-sev="all"].active    { background:rgba(99,102,241,0.15); border-color:var(--accent1); color:#a5b4fc; }
+
+/* ── Medicine list tab ─────────────────────────────────────── */
+#tab-pane-medicines { padding: 2rem; max-width: 900px; margin: 0 auto; }
+.med-tab-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; }
+.med-tab-sub   { font-size: 0.87rem; color: var(--muted); margin-bottom: 1.5rem; }
+#med-form {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+#med-form label { font-size: 0.78rem; color: var(--muted2); display: block; margin-bottom: 0.25rem; font-weight: 500; }
+#med-form input, #med-form select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 0.87rem;
+  padding: 0.45rem 0.75rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#med-form input:focus, #med-form select:focus { border-color: var(--accent1); }
+#med-form input[name="med-name"] { flex: 2; min-width: 160px; }
+#med-form input[name="med-dose"] { width: 90px; }
+#med-form select[name="med-unit"] { width: 80px; }
+#med-form input[name="med-frequency"] { flex: 1; min-width: 120px; }
+.med-add-btn {
+  background: var(--accent-grad);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.87rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  align-self: flex-end;
+}
+.med-add-btn:hover { opacity: 0.85; }
+#med-list-wrap { display: flex; flex-direction: column; gap: 0.6rem; }
+.med-empty {
+  text-align: center; color: var(--muted); font-size: 0.9rem;
+  padding: 2.5rem; border: 1px dashed var(--border); border-radius: 12px;
+}
+.med-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  transition: background 0.15s;
+}
+.med-row:hover { background: var(--card-hover); }
+.med-icon { font-size: 1.4rem; flex-shrink: 0; }
+.med-info { flex: 1; min-width: 0; }
+.med-name  { font-weight: 600; font-size: 0.97rem; }
+.med-dose  { font-size: 0.82rem; color: var(--muted2); margin-top: 0.1rem; }
+.med-del {
+  background: transparent; border: 1px solid rgba(244,63,94,0.3);
+  color: #f43f5e; border-radius: 6px; padding: 0.3rem 0.65rem;
+  font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
+}
+.med-del:hover { background: rgba(244,63,94,0.12); }
+
+/* ── Profile tab ───────────────────────────────────────────── */
+#tab-pane-profile { padding: 2rem; max-width: 1000px; margin: 0 auto; }
+.profile-header { display: flex; align-items: flex-start; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+.profile-photo-wrap {
+  flex-shrink: 0;
+  width: 130px;
+}
+.profile-photo-ring {
+  width: 120px; height: 120px; border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--card);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.profile-photo-ring:hover { border-color: var(--accent1); }
+.profile-photo-ring img { width: 100%; height: 100%; object-fit: cover; display: none; }
+.profile-photo-ring .photo-placeholder { font-size: 2.5rem; user-select: none; }
+.profile-photo-ring .photo-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; color: #fff; flex-direction: column; gap: 4px;
+}
+.profile-photo-ring:hover .photo-overlay { opacity: 1; }
+.profile-photo-ring.drag-over { border-color: var(--accent1); box-shadow: 0 0 0 3px rgba(99,102,241,0.3); }
+.profile-photo-hint { font-size: 0.7rem; color: var(--muted); text-align: center; margin-top: 0.4rem; }
+.profile-meta { flex: 1; min-width: 200px; }
+.profile-meta-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.2rem; }
+.profile-meta-sub   { font-size: 0.84rem; color: var(--muted); margin-bottom: 1rem; }
+.profile-snp-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25); border-radius: 999px; padding: 0.25rem 0.7rem; font-size: 0.78rem; color: #a5b4fc; margin-bottom: 0.5rem; }
+.profile-dna-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.profile-trait-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex; align-items: flex-start; gap: 0.8rem;
+  transition: background 0.15s;
+}
+.profile-trait-card:hover { background: var(--card-hover); }
+.profile-trait-icon { font-size: 1.6rem; flex-shrink: 0; margin-top: 0.1rem; }
+.profile-trait-body { flex: 1; }
+.profile-trait-name { font-size: 0.78rem; color: var(--muted2); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.15rem; }
+.profile-trait-result { font-size: 0.92rem; font-weight: 600; color: var(--text); }
+.profile-trait-rsid { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; font-family: monospace; }
+.profile-body-part  { font-size: 0.72rem; color: var(--accent1); margin-top: 0.25rem; font-weight: 500; }
+.profile-no-dna { text-align:center; color:var(--muted); padding:3rem 1rem; font-size:0.9rem; border:1px dashed var(--border); border-radius:12px; }
+.profile-trait-desc {
+  font-size: 0.8rem; color: var(--muted2); line-height: 1.55;
+  margin-top: 0.5rem;
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+.profile-expand-hint {
+  font-size: 0.7rem; color: var(--muted); margin-top: 0.3rem;
+  transition: opacity 0.2s;
+}
+.profile-trait-card.expanded .profile-trait-desc { max-height: 300px; }
+.profile-trait-card.expanded .profile-expand-hint { opacity: 0; height: 0; margin: 0; }
+
 /* ══════════════════════════════════════════════════════════════
    MAIN CONTENT AREA
 ══════════════════════════════════════════════════════════════ */
@@ -361,11 +532,18 @@ body {
   min-width: 0;
 }
 .card-trait-name {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--text);
   line-height: 1.3;
+  margin-bottom: 0.1rem;
+}
+.card-trait-scientific {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-family: monospace;
   margin-bottom: 0.2rem;
+  letter-spacing: 0.02em;
 }
 .card-category-label {
   font-size: 0.72rem;
@@ -602,34 +780,191 @@ body {
    EXPLORE THE SCIENCE SECTION
 ══════════════════════════════════════════════════════════════ */
 /* ── Chromosome scanner ─────────────────────────────────────── */
-#chrom-scanner-section {
-  background: #f8f7ff;
-  border-top: 1px solid #e0e7ff;
-  border-bottom: 1px solid #e0e7ff;
-}
-#chrom-scanner-section summary {
-  padding: 1.1rem 2rem;
-  cursor: pointer;
+/* ── Main horizontal tab bar ─────────────────────────────── */
+#main-tab-bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9rem;
+  gap: 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+.main-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 1.2rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: #6366f1;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.main-tab-btn:hover { color: var(--text); }
+.main-tab-btn.active {
+  color: #a5b4fc;
+  border-bottom-color: #6366f1;
+}
+.main-tab-pane { display: none; }
+.main-tab-pane.active { display: block; }
+
+/* ── Landing page ──────────────────────────────────────── */
+#landing-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 1.5rem 4rem;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+  gap: 2.5rem;
+}
+.landing-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+}
+.landing-dna-icon { font-size: 3.5rem; line-height: 1; }
+.landing-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+.landing-tagline {
+  font-size: 1.1rem;
+  color: var(--muted2);
+  font-weight: 400;
+  max-width: 480px;
+}
+.landing-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+.landing-upload-btn {
+  padding: 0.7rem 1.75rem;
+  font-size: 1rem;
+  border-radius: 10px;
+}
+.landing-demo-btn {
+  padding: 0.65rem 1.4rem;
+  font-size: 0.95rem;
+  border-radius: 10px;
+}
+.landing-or { color: var(--muted); font-size: 0.85rem; }
+.landing-formats { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+.landing-feature {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.25rem 1.3rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+.landing-feature:hover {
+  background: var(--card-hover);
+  border-color: rgba(99,102,241,0.35);
+}
+.lf-icon  { font-size: 1.8rem; margin-bottom: 0.5rem; }
+.lf-title { font-weight: 700; font-size: 0.97rem; margin-bottom: 0.3rem; }
+.lf-body  { font-size: 0.82rem; color: var(--muted2); line-height: 1.55; }
+
+.landing-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  max-width: 560px;
+  text-align: left;
+  line-height: 1.5;
+}
+
+/* ── Chromosome karyotype strip ──────────────────────────── */
+#karyotype-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 1.2rem 1.5rem 0.8rem;
+  overflow-x: auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+}
+.karyotype-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.karyotype-pill:hover { transform: translateY(-2px); }
+.karyotype-pill.active .karyotype-bar { box-shadow: 0 0 0 2px #6366f1; }
+.karyotype-bar {
+  border-radius: 3px;
+  width: 18px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+/* centromere notch — the constriction in the middle */
+.karyotype-bar::after {
+  content: '';
+  position: absolute;
+  left: 2px; right: 2px;
+  top: 45%; height: 10%;
+  background: var(--bg);
+  border-radius: 2px;
+  opacity: 0.5;
+}
+.karyotype-bar.state-pending  { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+.karyotype-bar.state-scanning { background: rgba(99,102,241,0.3); border-color: #6366f1; animation: chromPulse 0.9s ease-in-out infinite; }
+.karyotype-bar.state-findings { background: linear-gradient(180deg,#6366f1,#8b5cf6); border-color: #6366f1; }
+.karyotype-bar.state-drugs    { background: linear-gradient(180deg,#f59e0b,#d97706); border-color: #f59e0b; }
+.karyotype-bar.state-both     { background: linear-gradient(180deg,#22c55e,#16a34a); border-color: #22c55e; }
+.karyotype-bar.state-none     { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+.karyotype-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--muted);
   letter-spacing: 0.02em;
-  list-style: none;
-  user-select: none;
-  border-bottom: 1px solid transparent;
-  transition: background 0.15s;
+  font-variant-numeric: tabular-nums;
 }
-#chrom-scanner-section summary::-webkit-details-marker { display: none; }
-#chrom-scanner-section[open] summary {
-  border-bottom-color: #e0e7ff;
-  background: rgba(99,102,241,0.04);
-}
-#chrom-scanner-section summary:hover { background: rgba(99,102,241,0.07); }
-#chrom-scanner-section[open] .science-chevron { transform: rotate(180deg); }
-#chrom-scanner-inner { padding: 1.25rem 2rem 1.5rem; }
+.karyotype-pill.active .karyotype-label { color: #a5b4fc; }
 
 #chrom-grid {
   display: grid;
@@ -722,37 +1057,6 @@ body {
 }
 
 /* ── Microbiome section ─────────────────────────────────────── */
-#microbiome-section {
-  background: #f0fdf4;
-  border-top: 1px solid #bbf7d0;
-  border-bottom: 1px solid #bbf7d0;
-  margin-bottom: 0;
-}
-#microbiome-section summary {
-  padding: 1.1rem 2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #16a34a;
-  letter-spacing: 0.02em;
-  list-style: none;
-  user-select: none;
-  border-bottom: 1px solid transparent;
-  transition: background 0.15s;
-}
-#microbiome-section summary::-webkit-details-marker { display: none; }
-#microbiome-section[open] summary {
-  border-bottom-color: #bbf7d0;
-  background: rgba(34,197,94,0.05);
-}
-#microbiome-section summary:hover { background: rgba(34,197,94,0.08); }
-#microbiome-section[open] .science-chevron { transform: rotate(180deg); }
-#microbiome-inner {
-  padding: 1.5rem 2rem;
-}
 #microbiome-upload-area {
   display: flex;
   flex-direction: column;
@@ -1190,152 +1494,198 @@ body {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     CATEGORY FILTER PILLS
+     LANDING PAGE (shown until DNA is loaded)
 ══════════════════════════════════════════════════════════════ -->
-<div id="category-bar">
-  <button class="cat-pill active" data-cat="all" onclick="TraitUI.filter('all', this)">All</button>
-  <button class="cat-pill" data-cat="nutrition" onclick="TraitUI.filter('nutrition', this)">🥗 Nutrition</button>
-  <button class="cat-pill" data-cat="fitness" onclick="TraitUI.filter('fitness', this)">💪 Fitness</button>
-  <button class="cat-pill" data-cat="sleep" onclick="TraitUI.filter('sleep', this)">🌙 Sleep</button>
-  <button class="cat-pill" data-cat="allergies" onclick="TraitUI.filter('allergies', this)">🤧 Allergies</button>
-  <button class="cat-pill" data-cat="supplements" onclick="TraitUI.filter('supplements', this)">💊 Supplements</button>
-  <button class="cat-pill" data-cat="health" onclick="TraitUI.filter('health', this)">❤️ Health</button>
-  <button class="cat-pill" data-cat="traits" onclick="TraitUI.filter('traits', this)">🧬 Traits</button>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     MAIN CONTENT
-══════════════════════════════════════════════════════════════ -->
-<div id="main-content">
-
-  <!-- Empty state -->
-  <div id="empty-state">
-    <div class="empty-illustration">
-      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- DNA double helix illustration -->
-        <circle cx="80" cy="80" r="78" fill="rgba(99,102,241,0.05)" stroke="rgba(99,102,241,0.15)" stroke-width="1.5"/>
-        <!-- Strand 1 -->
-        <path d="M55 20 C65 35, 45 50, 55 65 C65 80, 45 95, 55 110 C65 125, 45 140, 55 155" stroke="#6366f1" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
-        <!-- Strand 2 -->
-        <path d="M105 20 C95 35, 115 50, 105 65 C95 80, 115 95, 105 110 C95 125, 115 140, 105 155" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
-        <!-- Rungs -->
-        <line x1="57" y1="32" x2="103" y2="32" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
-        <line x1="50" y1="48" x2="110" y2="48" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
-        <line x1="53" y1="65" x2="107" y2="65" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
-        <line x1="50" y1="82" x2="110" y2="82" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
-        <line x1="53" y1="99" x2="107" y2="99" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
-        <line x1="57" y1="116" x2="103" y2="116" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
-        <line x1="53" y1="132" x2="107" y2="132" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
-        <!-- Base dots -->
-        <circle cx="57" cy="32" r="4" fill="#6366f1" opacity="0.8"/>
-        <circle cx="103" cy="32" r="4" fill="#8b5cf6" opacity="0.8"/>
-        <circle cx="53" cy="65" r="4" fill="#00cc44" opacity="0.8"/>
-        <circle cx="107" cy="65" r="4" fill="#ff3355" opacity="0.8"/>
-        <circle cx="50" cy="82" r="4" fill="#3399ff" opacity="0.8"/>
-        <circle cx="110" cy="82" r="4" fill="#ffaa00" opacity="0.8"/>
-        <circle cx="53" cy="99" r="4" fill="#6366f1" opacity="0.8"/>
-        <circle cx="107" cy="99" r="4" fill="#8b5cf6" opacity="0.8"/>
-        <circle cx="57" cy="116" r="4" fill="#00cc44" opacity="0.8"/>
-        <circle cx="103" cy="116" r="4" fill="#ff3355" opacity="0.8"/>
-      </svg>
-    </div>
-    <div class="empty-title">Your wellness story starts here</div>
-    <div class="empty-sub">Upload your raw DNA data file from 23andMe, AncestryDNA, or any compatible service to see personalized health insights based on your unique genetic profile.</div>
-    <div class="empty-actions">
-      <button class="btn-primary" style="padding:0.65rem 1.5rem;font-size:0.95rem;" onclick="document.getElementById('file-input').click()">📂 Upload your DNA file</button>
-      <span class="empty-or">or</span>
-      <button class="btn" style="padding:0.65rem 1.2rem;font-size:0.9rem;" onclick="loadDemo()">Try the demo</button>
-    </div>
-  </div>
-
-  <!-- Pending data notice (shown when databases not yet downloaded) -->
-  <div id="pending-traits-banner" class="hidden" style="
-    margin: 0.5rem 1rem 1rem;
-    padding: 0.75rem 1rem;
-    background: rgba(99,102,241,0.08);
-    border: 1px solid rgba(99,102,241,0.25);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 0.82rem;
-    color: #a5b4fc;
-  ">
-    <span style="font-size:1.1rem;">🔬</span>
-    <span id="pending-traits-text">Additional insights pending database download</span>
-    <button onclick="downloadDatabases()" style="
-      margin-left: auto;
-      background: rgba(99,102,241,0.2);
-      border: 1px solid rgba(99,102,241,0.4);
-      color: #a5b4fc;
-      border-radius: 6px;
-      padding: 0.2rem 0.6rem;
-      font-size: 0.78rem;
-      cursor: pointer;
-    ">Download now</button>
-  </div>
-
-  <!-- Trait card grid (hidden until loaded) -->
-  <div id="trait-grid" class="hidden"></div>
-
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     CHROMOSOME SCANNER
-══════════════════════════════════════════════════════════════ -->
-<details id="chrom-scanner-section">
-  <summary>
-    <span>🧬</span>
-    <span>Chromosome Scanner</span>
-    <span style="font-size:0.8rem;color:#4a5f7a;font-weight:400;margin-left:0.5rem">— All 25 strands checked for findings</span>
-    <span class="science-chevron">▼</span>
-  </summary>
-
-  <div id="chrom-scanner-inner">
-    <div id="chrom-scan-header" style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap">
-      <div id="chrom-scan-summary" style="font-size:0.85rem;color:#4a5f7a"></div>
-      <button id="chrom-scan-btn" class="btn" onclick="ChromScanner.start()" style="margin-left:auto;padding:0.4rem 1rem;font-size:0.82rem">
-        🔬 Scan chromosomes
+<div id="landing-page">
+  <div class="landing-hero">
+    <div class="landing-dna-icon">🧬</div>
+    <h1 class="landing-title">HealthAgent</h1>
+    <p class="landing-tagline">Your personal wellness story, written in your DNA</p>
+    <div class="landing-actions">
+      <button class="btn-primary landing-upload-btn" onclick="document.getElementById('file-input').click()">
+        📂 Upload your DNA file
       </button>
+      <span class="landing-or">or</span>
+      <button class="btn landing-demo-btn" onclick="loadDemo()">✨ Try the demo</button>
     </div>
+    <p class="landing-formats">Supports 23andMe · AncestryDNA · MyHeritage · FTDNA · VCF</p>
+  </div>
 
-    <div id="chrom-scan-progress" style="display:none;margin-bottom:1rem">
-      <div style="display:flex;align-items:center;gap:0.75rem">
-        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
-          <div id="chrom-scan-bar" style="height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:3px;transition:width 0.3s ease;width:0%"></div>
-        </div>
-        <span id="chrom-scan-pct" style="font-size:0.78rem;color:#6366f1;font-weight:700;min-width:2.5rem">0%</span>
-        <span id="chrom-scan-label" style="font-size:0.78rem;color:#94a3b8">Starting…</span>
+  <div class="landing-features">
+    <div class="landing-feature">
+      <div class="lf-icon">🥗</div>
+      <div class="lf-title">Nutrition &amp; Diet</div>
+      <div class="lf-body">Discover how your genes affect nutrient absorption, food sensitivities, and dietary response.</div>
+    </div>
+    <div class="landing-feature">
+      <div class="lf-icon">💊</div>
+      <div class="lf-title">Medication Interactions</div>
+      <div class="lf-body">See how your genetic variants may affect how medications work in your body (pharmacogenomics).</div>
+    </div>
+    <div class="landing-feature">
+      <div class="lf-icon">💪</div>
+      <div class="lf-title">Fitness &amp; Performance</div>
+      <div class="lf-body">Find out if you're genetically power- or endurance-oriented, and how to train accordingly.</div>
+    </div>
+    <div class="landing-feature">
+      <div class="lf-icon">🌙</div>
+      <div class="lf-title">Sleep &amp; Stress</div>
+      <div class="lf-body">Learn about your natural chronotype and stress-response genetics to optimise recovery.</div>
+    </div>
+    <div class="landing-feature">
+      <div class="lf-icon">👁️</div>
+      <div class="lf-title">Physical Traits</div>
+      <div class="lf-body">Explore DNA predictions for eye colour, hair type, skin pigmentation, earwax, and more.</div>
+    </div>
+    <div class="landing-feature">
+      <div class="lf-icon">🔬</div>
+      <div class="lf-title">GWAS &amp; ClinVar</div>
+      <div class="lf-body">Access data from the world's largest genomic studies and clinical variant databases.</div>
+    </div>
+  </div>
+
+  <div class="landing-privacy">
+    <span>🔒</span>
+    <span>Your DNA file is processed locally and never stored on external servers. All analysis happens on your own device.</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MAIN TAB BAR
+══════════════════════════════════════════════════════════════ -->
+<nav id="main-tab-bar" style="display:none">
+  <button class="main-tab-btn active" data-tab="insights" onclick="switchMainTab('insights',this)">🧬 Insights</button>
+  <button class="main-tab-btn" data-tab="chromosomes" onclick="switchMainTab('chromosomes',this)">🔬 Chromosomes</button>
+  <button class="main-tab-btn" data-tab="microbiome" onclick="switchMainTab('microbiome',this)">🦠 Microbiome</button>
+  <button class="main-tab-btn" data-tab="medicines" onclick="switchMainTab('medicines',this)">💊 Medicines</button>
+  <button class="main-tab-btn" data-tab="profile" onclick="switchMainTab('profile',this)">👤 Profile</button>
+  <button class="main-tab-btn" data-tab="science" onclick="switchMainTab('science',this)">🔭 Science</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB: INSIGHTS
+══════════════════════════════════════════════════════════════ -->
+<div class="main-tab-pane active" id="tab-pane-insights">
+
+  <!-- category filter pills -->
+  <div id="category-bar">
+    <button class="cat-pill active" data-cat="all" onclick="TraitUI.filter('all', this)">All</button>
+    <button class="cat-pill" data-cat="nutrition" onclick="TraitUI.filter('nutrition', this)">🥗 Nutrition</button>
+    <button class="cat-pill" data-cat="fitness" onclick="TraitUI.filter('fitness', this)">💪 Fitness</button>
+    <button class="cat-pill" data-cat="sleep" onclick="TraitUI.filter('sleep', this)">🌙 Sleep</button>
+    <button class="cat-pill" data-cat="allergies" onclick="TraitUI.filter('allergies', this)">🤧 Allergies</button>
+    <button class="cat-pill" data-cat="supplements" onclick="TraitUI.filter('supplements', this)">💊 Supplements</button>
+    <button class="cat-pill" data-cat="health" onclick="TraitUI.filter('health', this)">❤️ Health</button>
+    <button class="cat-pill" data-cat="traits" onclick="TraitUI.filter('traits', this)">🧬 Traits</button>
+  </div>
+
+  <!-- severity filter sub-bar -->
+  <div id="severity-bar">
+    <span class="severity-label">Severity:</span>
+    <button class="sev-pill active" data-sev="all"    onclick="TraitUI.filterSeverity('all',this)">All</button>
+    <button class="sev-pill"        data-sev="high"   onclick="TraitUI.filterSeverity('high',this)">🔴 High</button>
+    <button class="sev-pill"        data-sev="medium" onclick="TraitUI.filterSeverity('medium',this)">🟡 Medium</button>
+    <button class="sev-pill"        data-sev="low"    onclick="TraitUI.filterSeverity('low',this)">🟢 Low</button>
+  </div>
+
+  <!-- main content (empty-state + trait grid) -->
+  <div id="main-content">
+
+    <!-- Empty state -->
+    <div id="empty-state">
+      <div class="empty-illustration">
+        <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="80" cy="80" r="78" fill="rgba(99,102,241,0.05)" stroke="rgba(99,102,241,0.15)" stroke-width="1.5"/>
+          <path d="M55 20 C65 35, 45 50, 55 65 C65 80, 45 95, 55 110 C65 125, 45 140, 55 155" stroke="#6366f1" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
+          <path d="M105 20 C95 35, 115 50, 105 65 C95 80, 115 95, 105 110 C95 125, 115 140, 105 155" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
+          <line x1="57" y1="32" x2="103" y2="32" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+          <line x1="50" y1="48" x2="110" y2="48" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
+          <line x1="53" y1="65" x2="107" y2="65" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+          <line x1="50" y1="82" x2="110" y2="82" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
+          <line x1="53" y1="99" x2="107" y2="99" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+          <line x1="57" y1="116" x2="103" y2="116" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" opacity="0.4"/>
+          <line x1="53" y1="132" x2="107" y2="132" stroke="#6366f1" stroke-width="2" stroke-dasharray="3,2" opacity="0.5"/>
+          <circle cx="57" cy="32" r="4" fill="#6366f1" opacity="0.8"/>
+          <circle cx="103" cy="32" r="4" fill="#8b5cf6" opacity="0.8"/>
+          <circle cx="53" cy="65" r="4" fill="#00cc44" opacity="0.8"/>
+          <circle cx="107" cy="65" r="4" fill="#ff3355" opacity="0.8"/>
+          <circle cx="50" cy="82" r="4" fill="#3399ff" opacity="0.8"/>
+          <circle cx="110" cy="82" r="4" fill="#ffaa00" opacity="0.8"/>
+          <circle cx="53" cy="99" r="4" fill="#6366f1" opacity="0.8"/>
+          <circle cx="107" cy="99" r="4" fill="#8b5cf6" opacity="0.8"/>
+          <circle cx="57" cy="116" r="4" fill="#00cc44" opacity="0.8"/>
+          <circle cx="103" cy="116" r="4" fill="#ff3355" opacity="0.8"/>
+        </svg>
+      </div>
+      <div class="empty-title">Your wellness story starts here</div>
+      <div class="empty-sub">Upload your raw DNA data file from 23andMe, AncestryDNA, or any compatible service to see personalized health insights based on your unique genetic profile.</div>
+      <div class="empty-actions">
+        <button class="btn-primary" style="padding:0.65rem 1.5rem;font-size:0.95rem;" onclick="document.getElementById('file-input').click()">📂 Upload your DNA file</button>
+        <span class="empty-or">or</span>
+        <button class="btn" style="padding:0.65rem 1.2rem;font-size:0.9rem;" onclick="loadDemo()">Try the demo</button>
       </div>
     </div>
 
-    <div id="chrom-grid"></div>
+    <!-- Pending data notice -->
+    <div id="pending-traits-banner" class="hidden" style="margin:0.5rem 1rem 1rem;padding:0.75rem 1rem;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:10px;display:flex;align-items:center;gap:0.6rem;font-size:0.82rem;color:#a5b4fc;">
+      <span style="font-size:1.1rem;">🔬</span>
+      <span id="pending-traits-text">Additional insights pending database download</span>
+      <button onclick="downloadDatabases()" style="margin-left:auto;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.78rem;cursor:pointer;">Download now</button>
+    </div>
 
+    <!-- Trait card grid -->
+    <div id="trait-grid" class="hidden"></div>
+
+  </div><!-- /main-content -->
+</div><!-- /tab-pane-insights -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB: CHROMOSOMES
+══════════════════════════════════════════════════════════════ -->
+<div class="main-tab-pane" id="tab-pane-chromosomes">
+
+  <!-- Karyotype strip: 25 pills in one scrollable row -->
+  <div id="karyotype-strip">
+    <!-- built by JS -->
+  </div>
+
+  <!-- Scan controls + progress -->
+  <div style="padding:0.9rem 1.5rem 0;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:0.9rem;">
+    <div id="chrom-scan-summary" style="font-size:0.85rem;color:#4a5f7a;flex:1;min-width:0"></div>
+    <button id="chrom-scan-btn" class="btn" onclick="ChromScanner.start()" style="padding:0.4rem 1rem;font-size:0.82rem">🔬 Scan chromosomes</button>
+  </div>
+  <div id="chrom-scan-progress" style="display:none;padding:0.6rem 1.5rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem">
+      <div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div id="chrom-scan-bar" style="height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:3px;transition:width 0.3s ease;width:0%"></div>
+      </div>
+      <span id="chrom-scan-pct" style="font-size:0.78rem;color:#a5b4fc;font-weight:700;min-width:2.5rem">0%</span>
+      <span id="chrom-scan-label" style="font-size:0.78rem;color:#64748b">Starting…</span>
+    </div>
+  </div>
+
+  <!-- Chromosome grid (existing logic) -->
+  <div style="padding:1rem 1.5rem 1.5rem">
+    <div id="chrom-grid"></div>
     <div id="chrom-legend" style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:1rem;font-size:0.74rem;color:#64748b">
       <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#6366f1;margin-right:4px;vertical-align:middle"></span>Wellness finding</span>
       <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>Drug interaction</span>
       <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#22c55e;margin-right:4px;vertical-align:middle"></span>Both</span>
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e2e8f0;margin-right:4px;vertical-align:middle"></span>No findings</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);margin-right:4px;vertical-align:middle"></span>No findings</span>
     </div>
   </div>
-</details>
+
+</div><!-- /tab-pane-chromosomes -->
 
 <!-- ══════════════════════════════════════════════════════════════
-     MICROBIOME SECTION
+     TAB: MICROBIOME
 ══════════════════════════════════════════════════════════════ -->
-<details id="microbiome-section">
-  <summary>
-    <span>🦠</span>
-    <span>Gut Microbiome Profile</span>
-    <span style="font-size:0.8rem;color:#4a5f7a;font-weight:400;margin-left:0.5rem">— Upload your HUMAnN pathway file</span>
-    <span class="science-chevron">▼</span>
-  </summary>
-
-  <div id="microbiome-inner">
-    <div id="microbiome-upload-area">
+<div class="main-tab-pane" id="tab-pane-microbiome">
+  <div id="microbiome-inner" style="padding:1.5rem 2rem">
+    <div id="microbiome-upload-area" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 2rem;text-align:center">
       <div style="font-size:2.5rem;margin-bottom:0.5rem">🦠</div>
-      <div style="font-weight:600;font-size:1rem;margin-bottom:0.4rem">Upload your microbiome data</div>
-      <div style="font-size:0.82rem;color:#4a5f7a;margin-bottom:1rem;max-width:420px;text-align:center">
+      <div style="font-weight:600;font-size:1rem;margin-bottom:0.4rem;color:var(--text)">Upload your microbiome data</div>
+      <div style="font-size:0.82rem;color:#4a5f7a;margin-bottom:1rem;max-width:420px">
         Upload a <strong>*_pathabundance.tsv</strong> file from HUMAnN 3.x to see which gut metabolic pathways are active — butyrate production, gut-brain signals, vitamin biosynthesis, and more.
       </div>
       <label class="btn-primary" style="cursor:pointer;padding:0.55rem 1.2rem;font-size:0.88rem">
@@ -1344,7 +1694,6 @@ body {
       </label>
       <div id="microbiome-upload-status" style="margin-top:0.75rem;font-size:0.82rem;color:#4a5f7a"></div>
     </div>
-
     <div id="microbiome-results" style="display:none">
       <div id="microbiome-summary-bar" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem;padding:0.75rem 1rem;background:rgba(99,102,241,0.06);border-radius:10px;align-items:center">
         <span id="mb-pathway-count" style="font-weight:700;font-size:1.1rem;color:#6366f1"></span>
@@ -1354,7 +1703,7 @@ body {
       <div id="microbiome-card-grid"></div>
     </div>
   </div>
-</details>
+</div><!-- /tab-pane-microbiome -->
 
 <!-- ══════════════════════════════════════════════════════════════
      DB STATUS BAR
@@ -1378,16 +1727,92 @@ body {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     EXPLORE THE SCIENCE (collapsible)
+     TAB: MEDICINES
 ══════════════════════════════════════════════════════════════ -->
-<details id="science-section">
-  <summary>
-    <span>🔬</span>
-    <span>Explore the Science</span>
-    <span style="font-size:0.8rem;color:#4a5f7a;font-weight:400;margin-left:0.5rem">— Interactive DNA visualisations</span>
-    <span class="science-chevron">▼</span>
-  </summary>
+<div class="main-tab-pane" id="tab-pane-medicines">
+  <div class="med-tab-title">💊 My Medicine List</div>
+  <div class="med-tab-sub">Track your current medications. This information is stored locally on your device only.</div>
 
+  <form id="med-form" onsubmit="MedUI.add(event)">
+    <div style="flex:1;min-width:160px">
+      <label>Medication name</label>
+      <input name="med-name" type="text" placeholder="e.g. Metformin" required style="width:100%">
+    </div>
+    <div>
+      <label>Dose</label>
+      <input name="med-dose" type="number" placeholder="500" min="0" step="any" required>
+    </div>
+    <div>
+      <label>Unit</label>
+      <select name="med-unit">
+        <option value="μg">μg</option>
+        <option value="mg" selected>mg</option>
+        <option value="g">g</option>
+        <option value="mL">mL</option>
+        <option value="IU">IU</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:120px">
+      <label>Frequency</label>
+      <input name="med-frequency" type="text" placeholder="e.g. Once daily" style="width:100%">
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button type="submit" class="med-add-btn">+ Add</button>
+    </div>
+  </form>
+
+  <div id="med-list-wrap">
+    <div class="med-empty">No medications added yet. Use the form above to add your first medication.</div>
+  </div>
+</div><!-- /tab-pane-medicines -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB: PROFILE
+══════════════════════════════════════════════════════════════ -->
+<div class="main-tab-pane" id="tab-pane-profile">
+
+  <div class="profile-header">
+    <!-- Photo upload -->
+    <div class="profile-photo-wrap">
+      <div class="profile-photo-ring" id="profile-photo-ring"
+           onclick="document.getElementById('profile-photo-input').click()"
+           ondragover="ProfileUI.dragOver(event)"
+           ondragleave="ProfileUI.dragLeave(event)"
+           ondrop="ProfileUI.drop(event)">
+        <img id="profile-photo-img" alt="Profile photo">
+        <span class="photo-placeholder">🧬</span>
+        <div class="photo-overlay">
+          <span>📷</span>
+          <span>Change photo</span>
+        </div>
+      </div>
+      <div class="profile-photo-hint">Click or drag &amp; drop a photo</div>
+      <input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="ProfileUI.loadPhoto(this)">
+    </div>
+
+    <!-- Meta info -->
+    <div class="profile-meta">
+      <div class="profile-meta-title">Your Genetic Profile</div>
+      <div class="profile-meta-sub">Physical and trait predictions derived from your DNA. These are statistical tendencies, not diagnoses.</div>
+      <div id="profile-snp-count" class="profile-snp-badge" style="display:none">
+        <span>🧬</span> <span id="profile-snp-num">0</span> SNPs analysed
+      </div>
+    </div>
+  </div>
+
+  <!-- DNA trait grid -->
+  <div id="profile-dna-grid" class="profile-dna-grid"></div>
+  <div id="profile-no-dna" class="profile-no-dna" style="display:none">
+    Upload your DNA file to see genetic trait predictions here.
+  </div>
+
+</div><!-- /tab-pane-profile -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB: SCIENCE
+══════════════════════════════════════════════════════════════ -->
+<div class="main-tab-pane" id="tab-pane-science">
   <div id="science-inner">
 
     <!-- Science sub-header -->
@@ -1522,7 +1947,7 @@ body {
 
     </div><!-- /sci-main -->
   </div><!-- /science-inner -->
-</details>
+</div><!-- /tab-pane-science -->
 
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -1530,12 +1955,28 @@ body {
 ══════════════════════════════════════════════════════════════ -->
 <script>
 // ═══════════════════════════════════════════════════════════════════
+//  MAIN TAB SWITCHER
+// ═══════════════════════════════════════════════════════════════════
+
+function switchMainTab(name, btn) {
+  document.querySelectorAll('.main-tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
+  const pane = document.getElementById('tab-pane-' + name);
+  if (pane) pane.classList.add('active');
+  if (btn)  btn.classList.add('active');
+  if (name === 'chromosomes' && !ChromScanner._data) ChromScanner.start();
+  if (name === 'medicines')   MedUI.render();
+  if (name === 'profile')     ProfileUI.load();
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  TRAIT UI — consumer health dashboard
 // ═══════════════════════════════════════════════════════════════════
 
 const TraitUI = {
   allTraits: [],
   activeCategory: 'all',
+  activeSeverity: 'all',
 
   // Category name normalisation map
   CAT_MAP: {
@@ -1569,7 +2010,7 @@ const TraitUI = {
         ...(data.clinvar  || []).filter(validTrait),
         ...(data.drugs    || []).filter(validTrait),
       ];
-      this.render(this.activeCategory);
+      this.render();
       this.updateHeroCount(this.allTraits.length);
 
       // Show pending banner if GWAS + ClinVar + drugs are all empty (db not downloaded yet)
@@ -1601,20 +2042,39 @@ const TraitUI = {
     this.activeCategory = category;
     document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
     if (btn) btn.classList.add('active');
-    this.render(category);
+    this.render();
   },
 
-  render(category) {
-    const grid = document.getElementById('trait-grid');
-    const empty = document.getElementById('empty-state');
+  filterSeverity(severity, btn) {
+    this.activeSeverity = severity;
+    document.querySelectorAll('.sev-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    this.render();
+  },
 
-    const filtered = category === 'all'
+  _severityOf(trait) {
+    const r = (trait.risk_level || '').toLowerCase();
+    if (r === 'elevated') return 'high';
+    if (r === 'variant')  return 'medium';
+    return 'low';
+  },
+
+  render() {
+    const grid  = document.getElementById('trait-grid');
+    const empty = document.getElementById('empty-state');
+    const cat   = this.activeCategory;
+    const sev   = this.activeSeverity;
+
+    let filtered = cat === 'all'
       ? this.allTraits
       : this.allTraits.filter(t => {
-          const cat = (t.category || '').toLowerCase();
-          return cat.includes(category) ||
-                 (t.category_label || '').toLowerCase().includes(category);
+          const c = (t.category || '').toLowerCase();
+          return c.includes(cat) || (t.category_label || '').toLowerCase().includes(cat);
         });
+
+    if (sev !== 'all') {
+      filtered = filtered.filter(t => this._severityOf(t) === sev);
+    }
 
     if (!filtered.length && !this.allTraits.length) {
       grid.classList.add('hidden');
@@ -1626,12 +2086,29 @@ const TraitUI = {
     grid.classList.remove('hidden');
     grid.innerHTML = '';
 
-    filtered.forEach((trait, i) => {
-      const card = this.buildCard(trait);
-      grid.appendChild(card);
-      // Staggered entrance animation
-      setTimeout(() => card.classList.add('visible'), 60 * i);
-    });
+    // Batch render to avoid blocking the main thread for large lists
+    const BATCH = 20;
+    const frag = document.createDocumentFragment();
+    const cards = filtered.map(trait => this.buildCard(trait));
+    cards.slice(0, BATCH).forEach(card => frag.appendChild(card));
+    grid.appendChild(frag);
+    // Trigger entrance animation for first batch
+    requestAnimationFrame(() => cards.slice(0, BATCH).forEach(c => c.classList.add('visible')));
+
+    // Append remaining in idle batches
+    let offset = BATCH;
+    const appendNext = () => {
+      if (offset >= cards.length) return;
+      const chunk = document.createDocumentFragment();
+      cards.slice(offset, offset + BATCH).forEach(card => {
+        chunk.appendChild(card);
+      });
+      grid.appendChild(chunk);
+      requestAnimationFrame(() => cards.slice(offset, offset + BATCH).forEach(c => c.classList.add('visible')));
+      offset += BATCH;
+      if (offset < cards.length) setTimeout(appendNext, 80);
+    };
+    if (offset < cards.length) setTimeout(appendNext, 80);
   },
 
   buildCard(trait) {
@@ -1666,6 +2143,7 @@ const TraitUI = {
           </div>
           <div class="card-title-group">
             <div class="card-trait-name">${escHtml(trait.trait_name || 'Trait')}</div>
+            <div class="card-trait-scientific">${[trait.gene ? escHtml(trait.gene) : '', trait.rsid ? escHtml(trait.rsid) : ''].filter(Boolean).join(' · ')}</div>
             <div class="card-category-label" style="color:${catColor}">${escHtml(catLabel)}</div>
           </div>
           ${riskLabel ? `<span class="risk-badge" style="color:${riskColor};background:${riskBg};border:1px solid ${riskColor}33;">${escHtml(riskLabel)}</span>` : ''}
@@ -1902,7 +2380,17 @@ async function uploadFile(input) {
   } finally { hideLoading(); }
 }
 
+function _revealApp() {
+  // Hide landing page, reveal tab bar + panes
+  const landing = document.getElementById('landing-page');
+  if (landing) landing.style.display = 'none';
+  const tabBar = document.getElementById('main-tab-bar');
+  if (tabBar) tabBar.style.display = '';
+}
+
 async function afterLoad(info) {
+  _revealApp();
+
   // Show/hide demo banner
   const banner = document.getElementById('demo-banner');
   if (info.filename === 'demo' || (info.filename || '').includes('demo')) {
@@ -2189,10 +2677,14 @@ async function selectChrom(chrom, btn) {
 function resizeCanvas(canvas) {
   const rect = canvas.getBoundingClientRect();
   const dpr  = window.devicePixelRatio || 1;
-  canvas.width  = rect.width  * dpr;
-  canvas.height = rect.height * dpr;
+  const newW = Math.round(rect.width  * dpr);
+  const newH = Math.round(rect.height * dpr);
+  if (canvas.width !== newW || canvas.height !== newH) {
+    canvas.width  = newW;
+    canvas.height = newH;
+  }
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { w: rect.width, h: rect.height };
 }
 
@@ -2872,10 +3364,15 @@ function drawChromatogram(canvas, snps, offsetPx) {
 function drawMiniHelix(canvas, theta) {
   const rect = canvas.getBoundingClientRect();
   const dpr  = window.devicePixelRatio || 1;
-  canvas.width  = rect.width  * dpr;
-  canvas.height = rect.height * dpr;
+  const newW = Math.round(rect.width  * dpr);
+  const newH = Math.round(rect.height * dpr);
+  // Only resize (expensive) when dimensions actually change
+  if (canvas.width !== newW || canvas.height !== newH) {
+    canvas.width  = newW;
+    canvas.height = newH;
+  }
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const w = rect.width, h = rect.height;
 
   ctx.clearRect(0, 0, w, h);
@@ -2936,10 +3433,27 @@ const miniHelixCanvas = document.getElementById('mini-helix');
 let chromaOff  = 0;   // chromatogram scroll offset in px
 let miniAngle  = 0;
 let lastTime   = null;
+const TARGET_FPS = 30;
+const FRAME_MS   = 1000 / TARGET_FPS;
+let   _rafPaused = false;
 
 function loop(ts) {
+  // Pause entirely when browser tab is hidden
+  if (document.hidden) {
+    lastTime = null;
+    raf = requestAnimationFrame(loop);
+    return;
+  }
+
   if (lastTime === null) lastTime = ts;
-  const dt = (ts - lastTime) / 1000;
+  const elapsed = ts - lastTime;
+
+  // Throttle to TARGET_FPS
+  if (elapsed < FRAME_MS) {
+    raf = requestAnimationFrame(loop);
+    return;
+  }
+  const dt = Math.min(elapsed / 1000, 0.1); // cap at 100ms to avoid jumps after tab switch
   lastTime = ts;
 
   const maxStrand = Math.max(1, snpData.length * zoom);
@@ -2950,8 +3464,9 @@ function loop(ts) {
   strandOff = (strandOff + dt * speed * zoom * 4) % maxStrand;
   chromaOff = (chromaOff + dt * speed * 22)       % maxChroma;
 
-  // Only draw science canvases if science section is open
-  const sciOpen = document.getElementById('science-section').open;
+  // Only draw science canvases if science tab is active
+  const sciPane = document.getElementById('tab-pane-science');
+  const sciOpen = sciPane && sciPane.classList.contains('active');
   if (sciOpen) {
     drawHelix(helixCanvas, snpData, angle);
     if      (activeTab === 'strand')       drawStrands(strandCanvas, snpData, strandOff, zoom);
@@ -2959,11 +3474,18 @@ function loop(ts) {
     else if (activeTab === 'chromatogram') drawChromatogram(chromaCanvas, snpData, chromaOff);
   }
 
-  // Always draw mini helix in hero
-  drawMiniHelix(miniHelixCanvas, miniAngle);
+  // Only draw mini helix if insights tab is active (it lives in the hero section)
+  const insightsPane = document.getElementById('tab-pane-insights');
+  const insightsOpen = insightsPane && insightsPane.classList.contains('active');
+  if (insightsOpen) drawMiniHelix(miniHelixCanvas, miniAngle);
 
   raf = requestAnimationFrame(loop);
 }
+
+// Pause RAF when page is hidden, resume when visible
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && lastTime === null) lastTime = null; // force reset
+});
 
 // Controls
 document.getElementById('speed-slider').addEventListener('input', e => {
@@ -3004,8 +3526,8 @@ const ChromScanner = {
   _data: null,
 
   async start() {
-    // Open the section if not already open
-    document.getElementById('chrom-scanner-section').open = true;
+    // Switch to chromosomes tab
+    switchMainTab('chromosomes', document.querySelector('[data-tab="chromosomes"]'));
 
     const btn = document.getElementById('chrom-scan-btn');
     btn.disabled = true;
@@ -3084,12 +3606,14 @@ const ChromScanner = {
         <div class="chrom-badges" id="cbadge-${i}"></div>
       </div>
     `).join('');
+    ChromScanner._buildKaryotype(chroms, null);
   },
 
   _setScanning(c, i) {
     const el = document.getElementById(`cb-${i}`);
     if (!el) return;
     el.className = 'chrom-block scanning';
+    ChromScanner._updateKaryotype(i, 'scanning');
   },
 
   _setDone(c, i) {
@@ -3098,33 +3622,58 @@ const ChromScanner = {
     if (!el) return;
 
     let cls = 'chrom-block done-none';
+    let stateStr = 'none';
     let badges = '';
 
     if (c.wellness_hits > 0 && c.drug_hits > 0) {
       cls = 'chrom-block done-both';
+      stateStr = 'both';
       badges = `<span class="chrom-badge chrom-badge-w">W ${c.wellness_hits}</span><span class="chrom-badge chrom-badge-d">D ${c.drug_hits}</span>`;
     } else if (c.wellness_hits > 0) {
       cls = 'chrom-block done-findings';
+      stateStr = 'findings';
       badges = `<span class="chrom-badge chrom-badge-w">W ${c.wellness_hits}</span>`;
     } else if (c.drug_hits > 0) {
       cls = 'chrom-block done-drugs';
+      stateStr = 'drugs';
       badges = `<span class="chrom-badge chrom-badge-d">D ${c.drug_hits}</span>`;
     }
 
     el.className = cls;
     if (badge) badge.innerHTML = badges;
+    ChromScanner._updateKaryotype(i, stateStr);
   },
 
-  // Auto-start when section is opened and profile is loaded
+  _buildKaryotype(chroms, states) {
+    // states = map of index → 'pending'|'scanning'|'findings'|'drugs'|'both'|'none'
+    const SIZES = [249,242,198,190,182,171,159,145,138,134,134,133,114,107,102,90,83,80,59,63,47,51,155,57,8];
+    const strip = document.getElementById('karyotype-strip');
+    if (!strip) return;
+    strip.innerHTML = chroms.map((c, i) => {
+      const h = Math.round(28 + (SIZES[i] / 249) * 44);
+      const state = (states && states[i]) || 'pending';
+      return `
+        <div class="karyotype-pill" id="kp-${i}" onclick="ChromScanner._selectChrom(${i})" title="Chr ${c.display}: ${c.snp_count.toLocaleString()} SNPs">
+          <div class="karyotype-bar state-${state}" id="kpbar-${i}" style="height:${h}px"></div>
+          <div class="karyotype-label">${c.display}</div>
+        </div>`;
+    }).join('');
+  },
+
+  _selectChrom(i) {
+    document.querySelectorAll('.karyotype-pill').forEach((p, j) => p.classList.toggle('active', j === i));
+    // scroll the chrom-grid to highlight the selected block
+    const block = document.getElementById('cb-' + i);
+    if (block) block.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  },
+
+  _updateKaryotype(i, state) {
+    const bar = document.getElementById('kpbar-' + i);
+    if (bar) bar.className = 'karyotype-bar state-' + state;
+  },
+
+  // Auto-start when profile is loaded
   init() {
-    const section = document.getElementById('chrom-scanner-section');
-    if (!section) return;
-    section.addEventListener('toggle', () => {
-      if (section.open && ChromScanner._data === null) {
-        // Only auto-scan if a profile is loaded
-        apiFetch('/api/profile').then(() => ChromScanner.start()).catch(() => {});
-      }
-    });
   },
 };
 
@@ -3241,6 +3790,175 @@ const MicrobiomeUI = {
     </div>`;
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════
+//  MEDICINE LIST UI
+// ═══════════════════════════════════════════════════════════════════
+
+const MedUI = {
+  _key: 'healthagent_medicines',
+
+  load() {
+    try { return JSON.parse(localStorage.getItem(this._key) || '[]'); } catch { return []; }
+  },
+
+  save(list) {
+    localStorage.setItem(this._key, JSON.stringify(list));
+  },
+
+  add(event) {
+    event.preventDefault();
+    const form = document.getElementById('med-form');
+    const name = form.querySelector('[name="med-name"]').value.trim();
+    const dose = form.querySelector('[name="med-dose"]').value.trim();
+    const unit = form.querySelector('[name="med-unit"]').value;
+    const freq = form.querySelector('[name="med-frequency"]').value.trim();
+    if (!name) return;
+    const list = this.load();
+    list.push({ id: Date.now(), name, dose, unit, freq });
+    this.save(list);
+    form.reset();
+    this.render();
+  },
+
+  remove(id) {
+    const list = this.load().filter(m => m.id !== id);
+    this.save(list);
+    this.render();
+  },
+
+  render() {
+    const wrap = document.getElementById('med-list-wrap');
+    const list = this.load();
+    if (!list.length) {
+      wrap.innerHTML = '<div class="med-empty">No medications added yet. Use the form above to add your first medication.</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(m => `
+      <div class="med-row">
+        <div class="med-icon">💊</div>
+        <div class="med-info">
+          <div class="med-name">${_esc(m.name)}</div>
+          <div class="med-dose">${_esc(m.dose)} ${_esc(m.unit)}${m.freq ? ' · ' + _esc(m.freq) : ''}</div>
+        </div>
+        <button class="med-del" onclick="MedUI.remove(${m.id})">Remove</button>
+      </div>
+    `).join('');
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  PROFILE UI — photo upload + DNA physical traits
+// ═══════════════════════════════════════════════════════════════════
+
+const ProfileUI = {
+  _photoKey: 'healthagent_profile_photo',
+
+  async load() {
+    this._restorePhoto();
+    await this._loadDnaTraits();
+  },
+
+  _restorePhoto() {
+    const stored = localStorage.getItem(this._photoKey);
+    if (stored) this._setPhoto(stored);
+  },
+
+  _setPhoto(dataUrl) {
+    const img = document.getElementById('profile-photo-img');
+    const placeholder = document.querySelector('.photo-placeholder');
+    img.src = dataUrl;
+    img.style.display = 'block';
+    if (placeholder) placeholder.style.display = 'none';
+  },
+
+  loadPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      localStorage.setItem(this._photoKey, dataUrl);
+      this._setPhoto(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  },
+
+  dragOver(e) {
+    e.preventDefault();
+    document.getElementById('profile-photo-ring').classList.add('drag-over');
+  },
+
+  dragLeave(e) {
+    document.getElementById('profile-photo-ring').classList.remove('drag-over');
+  },
+
+  drop(e) {
+    e.preventDefault();
+    document.getElementById('profile-photo-ring').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target.result;
+      localStorage.setItem(this._photoKey, dataUrl);
+      this._setPhoto(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  },
+
+  async _loadDnaTraits() {
+    const grid    = document.getElementById('profile-dna-grid');
+    const noDna   = document.getElementById('profile-no-dna');
+    const snpBadge = document.getElementById('profile-snp-count');
+    const snpNum   = document.getElementById('profile-snp-num');
+    try {
+      const data = await apiFetch('/api/physical_traits');
+      if (!data.available) {
+        grid.innerHTML = '';
+        noDna.style.display = 'block';
+        snpBadge.style.display = 'none';
+        return;
+      }
+      noDna.style.display = 'none';
+      // Show SNP count badge from profile
+      const profileData = await apiFetch('/api/profile');
+      if (profileData && profileData.snp_count) {
+        snpNum.textContent = profileData.snp_count.toLocaleString();
+        snpBadge.style.display = 'inline-flex';
+      }
+      if (!data.traits || !data.traits.length) {
+        grid.innerHTML = '<div class="profile-no-dna" style="display:block">No matching physical trait SNPs found in your DNA file.</div>';
+        return;
+      }
+      grid.innerHTML = data.traits.map(t => {
+        const hasDesc = t.what_it_means && t.what_it_means.length > 0;
+        const detailId = 'ptraits-' + t.rsid.replace(/[^a-z0-9]/gi, '');
+        return `
+          <div class="profile-trait-card${hasDesc ? ' has-desc' : ''}" ${hasDesc ? `onclick="this.classList.toggle('expanded')" style="cursor:pointer"` : ''}>
+            <div class="profile-trait-icon">${_esc(t.icon)}</div>
+            <div class="profile-trait-body">
+              <div class="profile-trait-name">${_esc(t.trait)}</div>
+              <div class="profile-trait-rsid">${[t.gene ? _esc(t.gene) : '', _esc(t.rsid)].filter(Boolean).join(' · ')} · ${_esc(t.genotype)}</div>
+              <div class="profile-trait-result">${_esc(t.result)}</div>
+              ${t.body_part ? `<div class="profile-body-part">${_esc(t.body_part)}</div>` : ''}
+              ${hasDesc ? `<div class="profile-trait-desc">${_esc(t.what_it_means)}</div>
+              <div class="profile-expand-hint">Tap to read more ▾</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch(e) {
+      console.error('ProfileUI._loadDnaTraits error:', e);
+      grid.innerHTML = '<div class="profile-no-dna" style="display:block">Could not load genetic traits. Please upload a DNA file first.</div>';
+      noDna.style.display = 'none';
+    }
+  },
+};
+
+function _esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>
