@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -243,6 +243,33 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+import re as _re_module
+
+# ── Upload security constants ─────────────────────────────────────
+_MAX_UPLOAD_BYTES   = 500 * 1024 * 1024   # 500 MB hard cap per upload
+_MAX_CHUNK_BYTES    = 6  * 1024 * 1024    # 6 MB per encrypted chunk (4 MB plain + overhead)
+_MAX_TOTAL_CHUNKS   = 200                 # cap at 800 MB raw
+_MIN_DNA_SNPS       = 10                  # reject if fewer than 10 SNPs parsed (not a DNA file)
+_UPLOAD_ID_RE       = _re_module.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+_SAFE_FILENAME_RE   = _re_module.compile(r'^[\w\-. ]+$')   # no path separators or special chars
+
+
+def _sanitise_filename(name: str) -> str:
+    """Strip path components and enforce safe characters."""
+    import os
+    name = os.path.basename(name or "upload.txt")
+    name = name[:128]  # max 128 chars
+    if not _SAFE_FILENAME_RE.match(name):
+        name = "upload.txt"
+    return name
+
+
+def _validate_upload_id(uid: str) -> None:
+    """Raise 400 if upload_id is not a valid UUID4 (prevents path traversal)."""
+    if not _UPLOAD_ID_RE.match(uid):
+        raise HTTPException(status_code=400, detail="Invalid upload_id format.")
+
+
 @app.post("/api/upload")
 async def upload_dna(
     file: UploadFile = File(...),
@@ -251,20 +278,36 @@ async def upload_dna(
     """Accept a raw DNA file and parse it into the session profile."""
     global _profile
     _touch_last_use()
+
+    safe_name = _sanitise_filename(file.filename or "upload.txt")
+
+    # Read with size cap
+    raw_bytes = await file.read(_MAX_UPLOAD_BYTES + 1)
+    if len(raw_bytes) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum upload size is 500 MB.")
+
+    raw = raw_bytes.decode("utf-8", errors="replace")
+
     try:
-        raw = (await file.read()).decode("utf-8", errors="replace")
-        _profile = import_dna_string(raw, filename=file.filename)
+        profile = import_dna_string(raw, filename=safe_name)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    # Persist to DB so profile survives server restarts
+    if profile.snp_count < _MIN_DNA_SNPS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No DNA data found in this file (only {profile.snp_count} SNPs parsed). "
+                   "Please upload a 23andMe, AncestryDNA, MyHeritage, FTDNA, or VCF file.",
+        )
+
+    _profile = profile
     background_tasks.add_task(save_profile, _profile)
     await _maybe_trigger_update(background_tasks)
 
     return {
         "format":    _profile.source_format.value,
         "snp_count": _profile.snp_count,
-        "filename":  file.filename,
+        "filename":  safe_name,
     }
 
 
@@ -278,7 +321,20 @@ async def upload_chunk(
 ):
     """Receive one AES-GCM encrypted chunk of a large DNA file."""
     _touch_last_use()
-    data = await chunk.read()
+
+    # Validate inputs
+    _validate_upload_id(upload_id)
+    if not (0 <= chunk_index < _MAX_TOTAL_CHUNKS):
+        raise HTTPException(status_code=400, detail="chunk_index out of allowed range.")
+    if not (1 <= total_chunks <= _MAX_TOTAL_CHUNKS):
+        raise HTTPException(status_code=400, detail="total_chunks out of allowed range.")
+    if chunk_index >= total_chunks:
+        raise HTTPException(status_code=400, detail="chunk_index must be less than total_chunks.")
+
+    data = await chunk.read(_MAX_CHUNK_BYTES + 1)
+    if len(data) > _MAX_CHUNK_BYTES:
+        raise HTTPException(status_code=413, detail="Chunk exceeds maximum allowed size.")
+
     # Store chunk on disk to avoid memory pressure for large files
     chunk_dir = CHUNK_UPLOAD_DIR / upload_id
     chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -300,6 +356,9 @@ async def commit_upload(
     global _profile
     _touch_last_use()
 
+    _validate_upload_id(req.upload_id)
+    safe_name = _sanitise_filename(req.filename)
+
     chunk_dir = CHUNK_UPLOAD_DIR / req.upload_id
     if not chunk_dir.exists():
         raise HTTPException(status_code=404, detail="Upload session not found. Upload chunks first.")
@@ -308,6 +367,8 @@ async def commit_upload(
 
     try:
         aes_key = base64.b64decode(req.aes_key_b64)
+        if len(aes_key) != 32:
+            raise ValueError("Key must be 32 bytes for AES-256")
         aesgcm  = AESGCM(aes_key)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid AES key.")
@@ -316,8 +377,11 @@ async def commit_upload(
     chunk_files = sorted(chunk_dir.glob("*.bin"), key=lambda p: int(p.stem))
     if not chunk_files:
         raise HTTPException(status_code=400, detail="No chunks found for this upload_id.")
+    if len(chunk_files) > _MAX_TOTAL_CHUNKS:
+        raise HTTPException(status_code=400, detail="Too many chunks.")
 
     parts = []
+    total_plain = 0
     for cf in chunk_files:
         blob = cf.read_bytes()
         if len(blob) < 13:
@@ -328,27 +392,37 @@ async def commit_upload(
             plain = aesgcm.decrypt(iv, ciphertext, None)
         except Exception:
             raise HTTPException(status_code=400, detail=f"Decryption failed on chunk {cf.name}. Key mismatch?")
+        total_plain += len(plain)
+        if total_plain > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Assembled file exceeds maximum allowed size.")
         parts.append(plain)
 
-    # Clean up temp files
+    # Clean up temp files regardless of outcome
     import shutil
     shutil.rmtree(chunk_dir, ignore_errors=True)
 
     raw = b"".join(parts).decode("utf-8", errors="replace")
 
     try:
-        _profile = import_dna_string(raw, filename=req.filename)
+        profile = import_dna_string(raw, filename=safe_name)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"DNA parse error: {exc}")
 
-    # Persist to DB so profile survives server restarts
+    if profile.snp_count < _MIN_DNA_SNPS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No DNA data found in this file (only {profile.snp_count} SNPs parsed). "
+                   "Please upload a 23andMe, AncestryDNA, MyHeritage, FTDNA, or VCF file.",
+        )
+
+    _profile = profile
     background_tasks.add_task(save_profile, _profile)
     await _maybe_trigger_update(background_tasks)
 
     return {
         "format":    _profile.source_format.value,
         "snp_count": _profile.snp_count,
-        "filename":  req.filename,
+        "filename":  safe_name,
     }
 
 
@@ -599,6 +673,102 @@ async def scan_chromosomes():
         "total_snps":    total_snps,
         "source_format": _profile.source_format.value,
     }
+
+
+@app.get("/api/scan/stream")
+async def scan_chromosomes_stream():
+    """Stream per-chromosome scan results as NDJSON — one JSON line per chromosome.
+
+    Sends a 'header' line first (total counts), then one 'chrom' line per chromosome
+    as it is processed. This lets the frontend render each section immediately
+    without waiting for all 25 to be computed.
+    """
+    import json as _json
+
+    if _profile is None:
+        raise HTTPException(status_code=404, detail="No DNA profile loaded.")
+
+    # Capture snapshot of profile SNPs to avoid race conditions
+    profile_snps = list(_profile.snps)
+
+    async def _generate():
+        from collections import defaultdict
+
+        # Build chromosome → SNP list map (in-memory, fast)
+        chrom_snps: dict[str, list] = defaultdict(list)
+        for s in profile_snps:
+            chrom_snps[s.chromosome].append(s)
+
+        all_chroms = sorted(chrom_snps.keys(), key=lambda c: (not c.isdigit(), c.zfill(3)))
+        total_snps = sum(len(v) for v in chrom_snps.values())
+
+        # Load DB lookup tables once (these are the only DB hits)
+        wellness_rows = local_db.query("SELECT rsid, genotype FROM wellness_trait")
+        drug_rsids = {
+            r["rsid"] for r in local_db.query(
+                "SELECT DISTINCT rsid FROM drug_interaction WHERE rsid IS NOT NULL AND rsid != ''"
+            )
+        }
+
+        wellness_genos: dict[str, set] = {}
+        for r in wellness_rows:
+            wellness_genos.setdefault(r["rsid"], set()).add(r["genotype"])
+
+        _COMPLEMENT_TR = str.maketrans("ACGT", "TGCA")
+
+        def _geno_variants(g: str):
+            c = g.translate(_COMPLEMENT_TR)
+            return {g, g[::-1], c, c[::-1]}
+
+        # Send header so the client knows the total upfront
+        yield _json.dumps({
+            "type":         "header",
+            "total_chroms": len(all_chroms),
+            "total_snps":   total_snps,
+            "source_format": _profile.source_format.value,
+        }) + "\n"
+
+        # Yield one chromosome at a time
+        for chrom in all_chroms:
+            snps = chrom_snps[chrom]
+            display = _CHROM_DISPLAY.get(chrom, chrom)
+            wellness_hits = drug_hits = homo = het = nocall = 0
+
+            for s in snps:
+                g = s.genotype.upper()
+                if not g or g in ("--", "00"):
+                    nocall += 1
+                elif len(g) == 2 and g[0] == g[1]:
+                    homo += 1
+                elif len(g) == 2:
+                    het += 1
+                if s.rsid in wellness_genos:
+                    if wellness_genos[s.rsid] & (_geno_variants(g) if g else set()):
+                        wellness_hits += 1
+                if s.rsid in drug_rsids:
+                    drug_hits += 1
+
+            yield _json.dumps({
+                "type":          "chrom",
+                "chromosome":    chrom,
+                "display":       display,
+                "snp_count":     len(snps),
+                "homozygous":    homo,
+                "heterozygous":  het,
+                "no_call":       nocall,
+                "wellness_hits": wellness_hits,
+                "drug_hits":     drug_hits,
+                "has_findings":  (wellness_hits + drug_hits) > 0,
+            }) + "\n"
+
+            # Yield control so other requests aren't blocked
+            await asyncio.sleep(0)
+
+    return StreamingResponse(
+        _generate(),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/api/db/status")
@@ -965,6 +1135,209 @@ _PHYSICAL_TRAIT_RSIDS: dict[str, dict] = {
         ),
     },
 }
+
+
+# ── US ↔ UK drug name equivalents ────────────────────────────────────
+# Each pair is (uk_name, us_name). Search terms are expanded to include both.
+_DRUG_NAME_ALIASES: list[tuple[str, str]] = [
+    ("paracetamol",     "acetaminophen"),
+    ("adrenaline",      "epinephrine"),
+    ("noradrenaline",   "norepinephrine"),
+    ("pethidine",       "meperidine"),
+    ("frusemide",       "furosemide"),
+    ("salbutamol",      "albuterol"),
+    ("lignocaine",      "lidocaine"),
+    ("amoxycillin",     "amoxicillin"),
+    ("phenobarbitone",  "phenobarbital"),
+    ("trimethoprim",    "trimethoprim"),  # same, kept for completeness
+    ("glibenclamide",   "glyburide"),
+    ("thyroxine",       "levothyroxine"),
+    ("rifampicin",      "rifampin"),
+    ("cephalexin",      "cefalexin"),
+    ("diclofenac",      "diclofenac"),    # same
+    ("clonazepam",      "clonazepam"),    # same
+    ("omeprazole",      "omeprazole"),    # same
+    ("fluoxetine",      "fluoxetine"),    # same
+    ("simvastatin",     "simvastatin"),   # same
+    ("metformin",       "metformin"),     # same
+    ("atenolol",        "atenolol"),      # same
+    ("codeine",         "codeine"),       # same
+    ("morphine",        "morphine"),      # same
+    ("ibuprofen",       "ibuprofen"),     # same
+    ("naproxen",        "naproxen"),      # same
+    ("aspirin",         "aspirin"),       # same
+    ("dexamethasone",   "dexamethasone"), # same
+    ("hydroxychloroquine", "hydroxychloroquine"), # same
+    ("azathioprine",    "azathioprine"),  # same
+    ("ciclosporin",     "cyclosporine"),
+    ("oestrogen",       "estrogen"),
+    ("oestradiol",      "estradiol"),
+    ("progesterone",    "progesterone"),  # same
+    ("suxamethonium",   "succinylcholine"),
+    ("hyoscine",        "scopolamine"),
+    ("bendroflumethiazide", "bendroflumethiazide"),  # same
+    ("indometacin",     "indomethacin"),
+    ("mefenamic acid",  "mefenamic acid"),  # same
+    ("chlorphenamine",  "chlorpheniramine"),
+    ("glyceryl trinitrate", "nitroglycerin"),
+    ("GTN",             "nitroglycerin"),
+    ("bisoprolol",      "bisoprolol"),    # same
+    ("ramipril",        "ramipril"),      # same
+    ("lisinopril",      "lisinopril"),    # same
+    ("amlodipine",      "amlodipine"),    # same
+    ("clopidogrel",     "clopidogrel"),   # same
+    ("atorvastatin",    "atorvastatin"),  # same
+    ("rosuvastatin",    "rosuvastatin"),  # same
+    ("sertraline",      "sertraline"),    # same
+    ("citalopram",      "citalopram"),    # same
+    ("escitalopram",    "escitalopram"),  # same
+    ("venlafaxine",     "venlafaxine"),   # same
+    ("quetiapine",      "quetiapine"),    # same
+    ("olanzapine",      "olanzapine"),    # same
+    ("risperidone",     "risperidone"),   # same
+    ("clozapine",       "clozapine"),     # same
+    ("haloperidol",     "haloperidol"),   # same
+    ("methotrexate",    "methotrexate"),  # same
+    ("warfarin",        "warfarin"),      # same
+    ("apixaban",        "apixaban"),      # same
+    ("rivaroxaban",     "rivaroxaban"),   # same
+    ("dabigatran",      "dabigatran"),    # same
+    ("prednisolone",    "prednisolone"),  # same
+    ("prednisone",      "prednisone"),    # same
+    ("tamoxifen",       "tamoxifen"),     # same
+    ("hydrochlorothiazide", "hydrochlorothiazide"),  # same
+    ("spironolactone",  "spironolactone"),  # same
+    ("carbamazepine",   "carbamazepine"), # same
+    ("valproate",       "valproic acid"),
+    ("sodium valproate","valproic acid"),
+    ("lamotrigine",     "lamotrigine"),   # same
+    ("levetiracetam",   "levetiracetam"), # same
+    ("phenytoin",       "phenytoin"),     # same
+    ("gabapentin",      "gabapentin"),    # same
+    ("pregabalin",      "pregabalin"),    # same
+    ("tramadol",        "tramadol"),      # same
+    ("oxycodone",       "oxycodone"),     # same
+    ("buprenorphine",   "buprenorphine"), # same
+    ("naloxone",        "naloxone"),      # same
+    ("methadone",       "methadone"),     # same
+    ("azithromycin",    "azithromycin"),  # same
+    ("clarithromycin",  "clarithromycin"), # same
+    ("doxycycline",     "doxycycline"),   # same
+    ("ciprofloxacin",   "ciprofloxacin"), # same
+    ("fluconazole",     "fluconazole"),   # same
+    ("aciclovir",       "acyclovir"),
+    ("ganciclovir",     "ganciclovir"),   # same
+    ("tenofovir",       "tenofovir"),     # same
+    ("efavirenz",       "efavirenz"),     # same
+    ("lopinavir",       "lopinavir"),     # same
+    ("ritonavir",       "ritonavir"),     # same
+    ("adalimumab",      "adalimumab"),    # same
+    ("infliximab",      "infliximab"),    # same
+    ("rituximab",       "rituximab"),     # same
+    ("trastuzumab",     "trastuzumab"),   # same
+    ("imatinib",        "imatinib"),      # same
+    ("erlotinib",       "erlotinib"),     # same
+    ("gefitinib",       "gefitinib"),     # same
+]
+
+
+def _expand_drug_query(q: str) -> list[str]:
+    """Return the query plus any US/UK alias expansions."""
+    ql = q.lower().strip()
+    extras: set[str] = set()
+    for uk, us in _DRUG_NAME_ALIASES:
+        if ql == uk.lower() or ql == us.lower() or ql in uk.lower() or ql in us.lower():
+            extras.add(uk)
+            extras.add(us)
+    # Always include original
+    all_terms = [q] + [e for e in extras if e.lower() != ql]
+    return list(dict.fromkeys(all_terms))  # deduplicate preserving order
+
+
+@app.get("/api/drugs/search")
+async def search_drugs(q: str = ""):
+    """Search drug_interaction table by drug name and return matching records.
+
+    Expands search to include US/UK name aliases so users can type either variant.
+    """
+    _touch_last_use()
+    if not q or len(q) < 2:
+        return {"results": [], "query": q}
+
+    terms = _expand_drug_query(q)
+    # Build WHERE clause for all aliases
+    placeholders = " OR ".join(f"LOWER(drug_name) LIKE LOWER(:pat{i})" for i in range(len(terms)))
+    params = {f"pat{i}": f"%{t}%" for i, t in enumerate(terms)}
+
+    rows = local_db.query(
+        f"""SELECT DISTINCT drug_name, gene, rsid, phenotype, significance,
+                  plain_english, category
+           FROM drug_interaction
+           WHERE {placeholders}
+           ORDER BY drug_name, gene
+           LIMIT 50""",
+        params,
+    )
+
+    from healthagent.health_traits import _drug_plain_result
+    results = []
+    for r in rows:
+        row = dict(r)
+        row["plain_result"] = _drug_plain_result(r["phenotype"] or "", r["category"] or "")
+        results.append(row)
+    return {"results": results, "query": q, "aliases_searched": terms}
+
+
+@app.get("/api/db/summary")
+async def db_summary():
+    """Return concise DB stats including last-updated and next-update timestamps."""
+    _touch_last_use()
+    stats = local_db.get_db_stats()
+    # Get the last completed download per source
+    logs = local_db.query(
+        """SELECT source, MAX(finished_at) as last_updated, MAX(started_at) as last_started
+           FROM download_log
+           WHERE status = 'completed'
+           GROUP BY source"""
+    )
+    last_updated = {r["source"]: r["last_updated"] for r in logs}
+
+    import time as _t
+    next_update_epoch = _last_use_time + _DB_UPDATE_INTERVAL_H * 3600
+    next_update_iso = None
+    if _last_use_time > 0:
+        import datetime
+        next_update_iso = datetime.datetime.utcfromtimestamp(next_update_epoch).strftime(
+            "%Y-%m-%d %H:%M UTC"
+        )
+
+    table_meta = {
+        "snp":                  {"label": "SNP Variants",            "source": "ancestrydna"},
+        "gwas_association":     {"label": "GWAS Associations",       "source": "gwas_catalog"},
+        "clinvar_variant":      {"label": "ClinVar Clinical",        "source": "clinvar"},
+        "drug_interaction":     {"label": "Drug Interactions",       "source": "pharmgkb"},
+        "wellness_trait":       {"label": "Wellness Traits",         "source": "wellness"},
+        "disgenet_association": {"label": "DisGeNET Diseases",       "source": "disgenet"},
+        "opentargets_association": {"label": "OpenTargets Scores",   "source": "opentargets"},
+        "ensembl_consequence":  {"label": "Ensembl Consequences",    "source": "ensembl"},
+        "biobank_phenotype":    {"label": "Biobank Phenotypes",      "source": "finngen"},
+    }
+
+    tables = []
+    for table, meta in table_meta.items():
+        tables.append({
+            "table":        table,
+            "label":        meta["label"],
+            "source":       meta["source"],
+            "records":      stats.get(table, 0),
+            "last_updated": last_updated.get(meta["source"]),
+        })
+
+    return {
+        "tables":           tables,
+        "next_update":      next_update_iso,
+        "update_interval_h": _DB_UPDATE_INTERVAL_H,
+    }
 
 
 @app.get("/api/physical_traits")

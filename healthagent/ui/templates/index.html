@@ -207,13 +207,13 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 1rem 2rem;
+  padding: 0.7rem 2rem;
   overflow-x: auto;
   scrollbar-width: none;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   position: sticky;
-  top: 65px;
+  top: 118px; /* header(65) + tab bar(53) */
   z-index: 90;
 }
 #category-bar::-webkit-scrollbar { display: none; }
@@ -328,8 +328,9 @@ body {
 }
 .med-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -341,12 +342,99 @@ body {
 .med-info { flex: 1; min-width: 0; }
 .med-name  { font-weight: 600; font-size: 0.97rem; }
 .med-dose  { font-size: 0.82rem; color: var(--muted2); margin-top: 0.1rem; }
+.med-row-pills {
+  width: 100%; display: flex; flex-wrap: wrap; gap: 0.35rem;
+  padding-left: 2.4rem; /* align under drug name */
+}
+.med-row-pill {
+  font-size: 0.68rem; font-weight: 600;
+  padding: 0.18rem 0.55rem; border-radius: 20px;
+  border: 1px solid var(--border); color: var(--muted2);
+  cursor: default; position: relative;
+}
+.med-row-pill.metabolism { border-color:#6366f1;color:#a5b4fc;background:rgba(99,102,241,0.1); }
+.med-row-pill.efficacy   { border-color:#22c55e;color:#86efac;background:rgba(34,197,94,0.1); }
+.med-row-pill.toxicity   { border-color:#f43f5e;color:#fda4af;background:rgba(244,63,94,0.1); }
+.med-row-pill.dosing     { border-color:#f59e0b;color:#fcd34d;background:rgba(245,158,11,0.1); }
+/* Tooltip */
+.med-row-pill::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b; color: #e2e8f0; font-size: 0.72rem; font-weight: 400;
+  line-height: 1.4; white-space: normal; width: max-content; max-width: 220px;
+  padding: 0.4rem 0.6rem; border-radius: 7px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  pointer-events: none; opacity: 0; transition: opacity 0.15s;
+  z-index: 200;
+}
+.med-row-pill:hover::after { opacity: 1; }
 .med-del {
   background: transparent; border: 1px solid rgba(244,63,94,0.3);
   color: #f43f5e; border-radius: 6px; padding: 0.3rem 0.65rem;
   font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
 }
 .med-del:hover { background: rgba(244,63,94,0.12); }
+
+/* ── Medicine drug-match results ───────────────────────────── */
+#med-dna-section { margin-top: 2rem; }
+.med-dna-title {
+  font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.med-summary-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.25rem 1.5rem;
+  display: flex; flex-direction: column; gap: 0.85rem;
+}
+.med-summary-drug {
+  font-size: 1.05rem; font-weight: 700; color: var(--text);
+}
+.med-summary-para {
+  font-size: 0.93rem; color: var(--text); line-height: 1.7;
+}
+.med-summary-tags {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+}
+.med-summary-tag {
+  font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.6rem;
+  border-radius: 20px; border: 1px solid var(--border); color: var(--muted2);
+}
+.med-summary-tag.metabolism { border-color: #6366f1; color: #a5b4fc; background: rgba(99,102,241,0.08); }
+.med-summary-tag.efficacy   { border-color: #22c55e; color: #86efac; background: rgba(34,197,94,0.08); }
+.med-summary-tag.toxicity   { border-color: #f43f5e; color: #fda4af; background: rgba(244,63,94,0.08); }
+.med-summary-tag.dosing     { border-color: #f59e0b; color: #fcd34d; background: rgba(245,158,11,0.08); }
+.med-summary-genes {
+  font-size: 0.75rem; color: var(--muted); font-family: monospace;
+}
+.med-no-match { text-align: center; color: var(--muted); font-size: 0.87rem; padding: 1.5rem; }
+
+/* ── DB Status Footer ───────────────────────────────────────── */
+#db-status-footer {
+  background: rgba(13,17,23,0.98); border-top: 1px solid var(--border);
+  padding: 1.5rem 2rem; margin-top: 3rem;
+}
+.db-footer-title {
+  font-size: 0.78rem; font-weight: 700; color: var(--muted2); text-transform: uppercase;
+  letter-spacing: 0.08em; margin-bottom: 1rem;
+}
+.db-footer-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem; margin-bottom: 1rem;
+}
+.db-footer-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.55rem 0.85rem; font-size: 0.78rem;
+}
+.db-footer-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.db-footer-dot.has-data { background: #22c55e; }
+.db-footer-dot.no-data  { background: #6b7280; }
+.db-footer-label { font-weight: 600; flex: 1; }
+.db-footer-count { color: var(--muted2); font-variant-numeric: tabular-nums; }
+.db-footer-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.75rem; text-align: center; }
 
 /* ── Profile tab ───────────────────────────────────────────── */
 #tab-pane-profile { padding: 2rem; max-width: 1000px; margin: 0 auto; }
@@ -784,34 +872,46 @@ body {
 #main-tab-bar {
   display: flex;
   align-items: center;
-  gap: 0;
-  background: var(--card);
+  gap: 0.4rem;
+  background: rgba(13,17,23,0.97);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
-  padding: 0 1.5rem;
+  padding: 0.6rem 1.5rem;
   position: sticky;
-  top: 0;
-  z-index: 90;
+  top: 65px;   /* below the header */
+  z-index: 95;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
 }
+#main-tab-bar::-webkit-scrollbar { display: none; }
 .main-tab-btn {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.85rem 1.2rem;
-  font-size: 0.85rem;
+  gap: 0.5rem;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  color: var(--muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
+  color: var(--muted2);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: all 0.18s ease;
   white-space: nowrap;
-  letter-spacing: 0.01em;
+  flex-shrink: 0;
 }
-.main-tab-btn:hover { color: var(--text); }
+.main-tab-btn:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(99,102,241,0.4);
+}
 .main-tab-btn.active {
-  color: #a5b4fc;
-  border-bottom-color: #6366f1;
+  color: #fff;
+  background: var(--accent-grad);
+  border-color: transparent;
+  box-shadow: 0 2px 12px rgba(99,102,241,0.35);
 }
 .main-tab-pane { display: none; }
 .main-tab-pane.active { display: block; }
@@ -1400,6 +1500,48 @@ body {
 }
 .uc-step { font-size: 0.78rem; color: #94a3b8; text-align: center; }
 
+/* ── DNA fact card shown during upload ─────────────────────── */
+#uc-dna-fact {
+  width: 100%;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  border: 1px solid rgba(99,102,241,0.35);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.4rem;
+  animation: factFade 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+#uc-dna-fact::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.08) 50%, transparent 100%);
+  animation: shimmerFact 2s ease-in-out infinite;
+}
+@keyframes shimmerFact {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes factFade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.uc-fact-label {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #818cf8;
+}
+.uc-fact-icon { font-size: 1.4rem; line-height: 1; }
+.uc-fact-title { font-size: 0.88rem; font-weight: 700; color: #e2e8f0; }
+.uc-fact-body  { font-size: 0.78rem; color: #94a3b8; line-height: 1.45; }
+.uc-fact-processing {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.7rem; color: #6366f1; font-weight: 600; margin-top: 0.1rem;
+}
+.uc-fact-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #6366f1;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+@keyframes dotPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
 .spinner {
   width: 44px;
   height: 44px;
@@ -1418,7 +1560,9 @@ body {
   #site-header { padding: 0.75rem 1rem; }
   .header-tagline { display: none; }
   #main-content { padding: 1rem 1rem 2rem; }
-  #category-bar { padding: 0.75rem 1rem; top: 57px; }
+  #category-bar { padding: 0.6rem 1rem; top: 106px; }
+  #main-tab-bar  { top: 57px; padding: 0.5rem 0.75rem; gap: 0.3rem; }
+  .main-tab-btn  { padding: 0.45rem 0.8rem; font-size: 0.8rem; }
   #sci-main { grid-template-columns: 1fr; grid-template-rows: auto; }
   #sci-aside { grid-row: auto; border-right: none; border-bottom: 1px solid #1f2d45; }
 }
@@ -1446,6 +1590,21 @@ body {
     </div>
     <div class="uc-pct" id="uc-pct">0%</div>
     <div class="uc-step" id="uc-step">Preparing…</div>
+
+    <!-- Rotating DNA fact card -->
+    <div id="uc-dna-fact">
+      <div class="uc-fact-label">🧬 Did you know?</div>
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <div class="uc-fact-icon" id="uc-fact-icon">🔬</div>
+        <div class="uc-fact-title" id="uc-fact-title">Reading your genome…</div>
+      </div>
+      <div class="uc-fact-body" id="uc-fact-body">Your DNA contains approximately 3 billion base pairs.</div>
+      <div class="uc-fact-processing">
+        <div class="uc-fact-dot"></div>
+        Processing your data securely
+      </div>
+    </div>
+
     <div class="uc-subtitle">
       Your file is split into chunks and encrypted before it leaves your device.<br>
       Nothing is stored unencrypted on our server.
@@ -1551,15 +1710,20 @@ body {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
+     APP SHELL — hidden until DNA is loaded
+══════════════════════════════════════════════════════════════ -->
+<div id="app-shell" style="display:none">
+
+<!-- ══════════════════════════════════════════════════════════════
      MAIN TAB BAR
 ══════════════════════════════════════════════════════════════ -->
-<nav id="main-tab-bar" style="display:none">
-  <button class="main-tab-btn active" data-tab="insights" onclick="switchMainTab('insights',this)">🧬 Insights</button>
-  <button class="main-tab-btn" data-tab="chromosomes" onclick="switchMainTab('chromosomes',this)">🔬 Chromosomes</button>
-  <button class="main-tab-btn" data-tab="microbiome" onclick="switchMainTab('microbiome',this)">🦠 Microbiome</button>
-  <button class="main-tab-btn" data-tab="medicines" onclick="switchMainTab('medicines',this)">💊 Medicines</button>
-  <button class="main-tab-btn" data-tab="profile" onclick="switchMainTab('profile',this)">👤 Profile</button>
-  <button class="main-tab-btn" data-tab="science" onclick="switchMainTab('science',this)">🔭 Science</button>
+<nav id="main-tab-bar">
+  <button class="main-tab-btn active" data-tab="insights"    onclick="switchMainTab('insights',this)">🧬 My Health Insights</button>
+  <button class="main-tab-btn"        data-tab="profile"     onclick="switchMainTab('profile',this)">👤 My Profile</button>
+  <button class="main-tab-btn"        data-tab="medicines"   onclick="switchMainTab('medicines',this)">💊 My Medicines</button>
+  <button class="main-tab-btn"        data-tab="chromosomes" onclick="switchMainTab('chromosomes',this)">🔬 DNA Map</button>
+  <button class="main-tab-btn"        data-tab="microbiome"  onclick="switchMainTab('microbiome',this)">🦠 Gut Health</button>
+  <button class="main-tab-btn"        data-tab="science"     onclick="switchMainTab('science',this)">🔭 Science View</button>
 </nav>
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -1733,6 +1897,20 @@ body {
   <div class="med-tab-title">💊 My Medicine List</div>
   <div class="med-tab-sub">Track your current medications. This information is stored locally on your device only.</div>
 
+  <!-- Allergic reaction / medical disclaimer warning -->
+  <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:1.25rem;display:flex;gap:0.75rem;align-items:flex-start">
+    <span style="font-size:1.3rem;flex-shrink:0">⚠️</span>
+    <div>
+      <div style="font-weight:700;font-size:0.9rem;color:#f59e0b;margin-bottom:0.25rem">Important Medical Notice</div>
+      <div style="font-size:0.82rem;color:var(--text);line-height:1.5">
+        The genetic information shown here is <strong>informational only</strong> and not a substitute for professional medical advice.
+        If you have known allergies, consult your doctor or pharmacist before starting any new medication.
+        Always report any signs of an allergic reaction — rash, swelling, difficulty breathing — to a healthcare professional immediately.
+        Do not stop or change medication doses based solely on this information.
+      </div>
+    </div>
+  </div>
+
   <form id="med-form" onsubmit="MedUI.add(event)">
     <div style="flex:1;min-width:160px">
       <label>Medication name</label>
@@ -1764,6 +1942,17 @@ body {
 
   <div id="med-list-wrap">
     <div class="med-empty">No medications added yet. Use the form above to add your first medication.</div>
+  </div>
+
+  <!-- DNA drug-match results shown after adding a medicine -->
+  <div id="med-dna-section" style="display:none">
+    <div class="med-dna-title">🧬 What Your DNA Says About This Medication</div>
+    <div id="med-dna-results"></div>
+    <div style="background:rgba(244,63,94,0.07);border:1px solid rgba(244,63,94,0.25);border-radius:10px;padding:0.75rem 1rem;margin-top:1rem;font-size:0.8rem;color:var(--muted);line-height:1.5">
+      🩺 <strong>Always consult your doctor or pharmacist</strong> before starting, stopping, or changing any medication.
+      Genetic interactions are one of many factors your healthcare provider considers when prescribing.
+      If you experience unexpected side effects or signs of an allergic reaction (rash, swelling, shortness of breath), seek medical attention immediately.
+    </div>
   </div>
 </div><!-- /tab-pane-medicines -->
 
@@ -1949,6 +2138,7 @@ body {
   </div><!-- /science-inner -->
 </div><!-- /tab-pane-science -->
 
+</div><!-- /app-shell -->
 
 <!-- ══════════════════════════════════════════════════════════════
      JAVASCRIPT
@@ -2256,9 +2446,72 @@ function showLoading(msg) {
   document.getElementById('loading-overlay').classList.add('visible');
 }
 function hideLoading() {
+  _stopDnaFacts();
   document.getElementById('loading-overlay').classList.remove('visible');
   document.getElementById('loading-default').style.display = 'flex';
   document.getElementById('upload-card').style.display = 'none';
+}
+
+// ── DNA facts shown while upload is in progress ──────────────
+const _DNA_FACTS = [
+  { icon:'🧬', title:'3 Billion Base Pairs', body:'Your genome contains about 3.2 billion DNA base pairs — if stretched out it would be roughly 2 metres long, coiled inside a cell just 6 micrometres wide.' },
+  { icon:'🔬', title:'Only ~1.5% is Protein-Coding', body:'Less than 2% of your DNA codes for proteins. The rest includes regulatory regions, introns, and sequences whose roles science is still uncovering.' },
+  { icon:'🧪', title:'99.9% Identical to Every Human', body:'You share 99.9% of your DNA with every other person on Earth. The 0.1% difference — about 3 million variants — shapes your unique traits and health risks.' },
+  { icon:'💡', title:'SNPs: Your Genetic Fingerprint', body:'Single Nucleotide Polymorphisms (SNPs) are single-letter changes in the genome. Your file contains hundreds of thousands of them — the foundation of this analysis.' },
+  { icon:'💊', title:'Pharmacogenomics', body:'Your DNA can affect how quickly you metabolise medications. Variants in genes like CYP2D6 and CYP2C19 influence the dose needed and risk of side effects.' },
+  { icon:'🏋️', title:'Fitness Genetics', body:'Genes like ACTN3 influence whether you have more fast-twitch or slow-twitch muscle fibres — affecting your natural aptitude for sprinting vs endurance.' },
+  { icon:'😴', title:'Sleep & Your Genome', body:'Variants near the PER3 gene are linked to whether you\'re a natural morning person or night owl — your chronotype is partly written in your DNA.' },
+  { icon:'🥗', title:'Nutrient Absorption', body:'Variants in MTHFR affect folate metabolism. Variants in VDR influence vitamin D absorption. Your diet needs can differ from population averages because of your genes.' },
+  { icon:'🤧', title:'Immune System Genetics', body:'The HLA gene region is the most variable in the human genome and governs how your immune system recognises pathogens — influencing allergy and autoimmune risk.' },
+  { icon:'🌍', title:'Ancestry in Your DNA', body:'Patterns of SNPs across chromosomes reflect ancient migration and population history — your genome carries echoes of where your ancestors lived thousands of years ago.' },
+  { icon:'🔐', title:'AES-256 Encryption', body:'Each chunk of your file is encrypted in your browser with a unique AES-256-GCM key before it is sent. The raw data never leaves your device unencrypted.' },
+  { icon:'🧠', title:'Brain & Behaviour Genetics', body:'Thousands of common variants each contribute tiny amounts to traits like intelligence, personality, and mental health risk — no single gene determines these complex traits.' },
+  { icon:'❤️', title:'Cardiovascular Genetics', body:'Variants near genes like PCSK9 and LPA influence cholesterol levels and heart disease risk — knowledge that can guide preventive care decades before symptoms appear.' },
+  { icon:'🔭', title:'GWAS Research', body:'Genome-Wide Association Studies have catalogued millions of SNP-trait associations. HealthAgent cross-references your variants against this ever-growing body of research.' },
+  { icon:'🧫', title:'Mitochondrial DNA', body:'You also carry mitochondrial DNA, inherited almost entirely from your mother. It traces your direct maternal lineage back through thousands of generations.' },
+  { icon:'📊', title:'Polygenic Risk Scores', body:'Most complex diseases are influenced by thousands of tiny genetic effects. Adding them up into a polygenic score gives a population-level risk estimate for traits like BMI or Type 2 diabetes.' },
+  { icon:'🔗', title:'Epigenetics', body:'Your DNA sequence isn\'t the whole story. Methylation and other chemical marks switch genes on and off in response to diet, stress, and environment — without changing the sequence itself.' },
+  { icon:'🌱', title:'Gene-Environment Interaction', body:'Genetic risk is never destiny. A variant that raises heart disease risk may be completely offset by exercise, diet, and not smoking — environment shapes which genes are expressed.' },
+];
+
+let _factInterval = null;
+let _factIdx = 0;
+
+function _startDnaFacts() {
+  const el = document.getElementById('uc-dna-fact');
+  if (!el) return;
+  el.style.display = 'flex';
+  // Shuffle to start at a random fact
+  _factIdx = Math.floor(Math.random() * _DNA_FACTS.length);
+  _showFact(_factIdx);
+  _factInterval = setInterval(() => {
+    _factIdx = (_factIdx + 1) % _DNA_FACTS.length;
+    _showFact(_factIdx);
+  }, 3000);
+}
+
+function _stopDnaFacts() {
+  if (_factInterval) { clearInterval(_factInterval); _factInterval = null; }
+  const el = document.getElementById('uc-dna-fact');
+  if (el) el.style.display = 'none';
+}
+
+function _showFact(idx) {
+  const f = _DNA_FACTS[idx];
+  const iconEl  = document.getElementById('uc-fact-icon');
+  const titleEl = document.getElementById('uc-fact-title');
+  const bodyEl  = document.getElementById('uc-fact-body');
+  if (!iconEl) return;
+  // Fade out → update → fade in
+  const card = document.getElementById('uc-dna-fact');
+  card.style.opacity = '0';
+  card.style.transition = 'opacity 0.25s';
+  setTimeout(() => {
+    iconEl.textContent  = f.icon;
+    titleEl.textContent = f.title;
+    bodyEl.textContent  = f.body;
+    card.style.opacity = '1';
+  }, 260);
 }
 
 function showUploadCard(filename) {
@@ -2269,6 +2522,7 @@ function showUploadCard(filename) {
   document.getElementById('loading-default').style.display = 'none';
   document.getElementById('upload-card').style.display = 'flex';
   document.getElementById('loading-overlay').classList.add('visible');
+  _startDnaFacts();
 }
 function updateUploadCard(chunkIdx, totalChunks, stepMsg) {
   const pct = Math.round(((chunkIdx + 1) / totalChunks) * 100);
@@ -2298,9 +2552,67 @@ async function loadDemo() {
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
+// ── Client-side DNA file validation ─────────────────────────────
+// Reads the first 8 KB and checks for known DNA file signatures.
+// Rejects files with no recognisable DNA content before any upload starts.
+async function _validateDnaFile(file) {
+  const MAX_PREVIEW = 8192; // 8 KB
+  const slice = file.slice(0, MAX_PREVIEW);
+  const text  = await slice.text().catch(() => '');
+
+  // Known DNA format header patterns
+  const dnaPatterns = [
+    /^#.*23andMe/im,
+    /^#.*AncestryDNA/im,
+    /^#.*MyHeritage/im,
+    /^#.*FTDNA/im,
+    /^#.*familytreedna/im,
+    /^rsid\s+chromosome\s+position/im,  // generic tab-sep header
+    /^#\s*rsid/im,
+    /##fileformat=VCF/i,                // VCF format
+    /^rs\d+\s+\d+\s+\d+\s+[ACGT]{2}/m, // data rows: rsID chr pos genotype
+  ];
+
+  // Abusive content patterns — reject if found
+  const abusePatterns = [
+    /<script[\s>]/i,
+    /javascript:/i,
+    /on\w+\s*=/i,        // onerror= onload= etc.
+    /exec\s*\(/i,
+    /eval\s*\(/i,
+    /import\s+os/i,
+    /subprocess/i,
+    /\bSHELL\b/,
+    /\bCMD\b\s*\/c/i,
+    /\bpowershell\b/i,
+  ];
+
+  for (const p of abusePatterns) {
+    if (p.test(text)) return { ok: false, reason: 'The file contains disallowed content and cannot be uploaded.' };
+  }
+
+  const hasDna = dnaPatterns.some(p => p.test(text));
+  if (!hasDna) {
+    return {
+      ok: false,
+      reason: 'No DNA data detected in this file.\n\nHealthAgent accepts files from 23andMe, AncestryDNA, MyHeritage, FTDNA, or VCF format. Please check you have selected the correct file.',
+    };
+  }
+  return { ok: true };
+}
+
 async function uploadFile(input) {
   const file = input.files[0];
   if (!file) return;
+  // Reset input so the same file can be re-selected after an error
+  input.value = '';
+
+  // Validate before touching the server
+  const check = await _validateDnaFile(file);
+  if (!check.ok) {
+    alert('⚠️ Upload rejected\n\n' + check.reason);
+    return;
+  }
 
   if (file.size <= CHUNK_SIZE) {
     // Small file — direct upload (no chunking needed)
@@ -2381,11 +2693,15 @@ async function uploadFile(input) {
 }
 
 function _revealApp() {
-  // Hide landing page, reveal tab bar + panes
+  // Hide landing page, reveal the entire app shell (tab bar + all panes)
   const landing = document.getElementById('landing-page');
   if (landing) landing.style.display = 'none';
-  const tabBar = document.getElementById('main-tab-bar');
-  if (tabBar) tabBar.style.display = '';
+  const shell = document.getElementById('app-shell');
+  if (shell) shell.style.display = '';
+  // Show DB footer and load stats
+  const footer = document.getElementById('db-status-footer');
+  if (footer) footer.style.display = '';
+  DBFooter.load();
 }
 
 async function afterLoad(info) {
@@ -3508,10 +3824,23 @@ function withAlpha(hex, a) {
 // ═══════════════════════════════════════════════════════════════════
 //  Init
 // ═══════════════════════════════════════════════════════════════════
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   requestAnimationFrame(loop);
   loadDbStatus();
   ChromScanner.init();
+  // If server already has a profile loaded (e.g. from a previous session or demo),
+  // auto-reveal the app without requiring a fresh upload.
+  try {
+    const prof = await apiFetch('/api/profile');
+    if (prof && prof.snp_count > 0) {
+      _revealApp();
+      await afterLoad({
+        filename:  prof.filename  || 'loaded',
+        format:    prof.format    || '',
+        snp_count: prof.snp_count || 0,
+      });
+    }
+  } catch(_) { /* no profile yet — stay on landing page */ }
 });
 
 window.addEventListener('resize', () => {
@@ -3519,152 +3848,202 @@ window.addEventListener('resize', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-//  CHROMOSOME SCANNER
+//  CHROMOSOME SCANNER  — streaming, progressive load
 // ════════════════════════════════════════════════════════════════
 const ChromScanner = {
 
-  _data: null,
+  _data:      null,   // final assembled data
+  _scanning:  false,  // guard against double-starts
+  _chromIdx:  {},     // display label → grid index (built during placeholder phase)
 
   async start() {
-    // Switch to chromosomes tab
+    if (ChromScanner._scanning) return;
+    ChromScanner._scanning = true;
+
     switchMainTab('chromosomes', document.querySelector('[data-tab="chromosomes"]'));
 
-    const btn = document.getElementById('chrom-scan-btn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Scanning…';
-
+    const btn      = document.getElementById('chrom-scan-btn');
     const progress = document.getElementById('chrom-scan-progress');
     const bar      = document.getElementById('chrom-scan-bar');
     const pct      = document.getElementById('chrom-scan-pct');
     const label    = document.getElementById('chrom-scan-label');
-    progress.style.display = 'block';
 
-    // Fetch all 25 chromosome results in one call
-    let data;
+    btn.disabled    = true;
+    btn.textContent = '⏳ Scanning…';
+    progress.style.display = 'block';
+    bar.style.width = '0%';
+    pct.textContent = '0%';
+    label.textContent = 'Connecting…';
+
+    // Clear any previous results
+    document.getElementById('chrom-grid').innerHTML = '';
+    document.getElementById('karyotype-strip').innerHTML = '';
+    ChromScanner._chromIdx = {};
+
+    const collectedChroms = [];
+    let totalChroms = 0, totalSnps = 0, received = 0;
+
     try {
-      data = await apiFetch('/api/scan');
+      const resp = await fetch('/api/scan/stream');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      const reader  = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let   buffer  = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete last line
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let msg;
+          try { msg = JSON.parse(line); } catch { continue; }
+
+          if (msg.type === 'header') {
+            // We now know the total — build placeholder grid immediately
+            totalChroms = msg.total_chroms;
+            totalSnps   = msg.total_snps;
+            label.textContent = `Scanning ${totalChroms} chromosomes…`;
+            ChromScanner._buildPlaceholders(totalChroms);
+
+          } else if (msg.type === 'chrom') {
+            received++;
+            collectedChroms.push(msg);
+
+            // Update this chromosome's grid card and karyotype bar
+            const idx = received - 1;
+            ChromScanner._chromIdx[msg.display] = idx;
+            ChromScanner._revealChrom(msg, idx);
+
+            // Update progress bar
+            const p = Math.round((received / totalChroms) * 100);
+            bar.style.width   = p + '%';
+            pct.textContent   = p + '%';
+            label.textContent = `Chromosome ${msg.display} — ${msg.snp_count.toLocaleString()} SNPs`;
+          }
+        }
+      }
     } catch(e) {
-      btn.disabled = false;
+      btn.disabled    = false;
       btn.textContent = '🔬 Scan chromosomes';
       progress.style.display = 'none';
-      alert('Scan failed: ' + e.message);
+      ChromScanner._scanning = false;
+      label.textContent = '⚠ Scan failed — ' + e.message;
       return;
     }
 
-    ChromScanner._data = data;
-    const chroms = data.chromosomes;
-    const total  = chroms.length;
+    // Stash assembled data for re-use
+    ChromScanner._data = {
+      chromosomes:   collectedChroms,
+      total_snps:    totalSnps,
+      total_parts:   totalChroms,
+    };
 
-    // Build placeholder grid first (all pending)
-    ChromScanner._buildGrid(chroms, -1);
+    // Final summary line
+    const wTotal = collectedChroms.reduce((s, c) => s + c.wellness_hits, 0);
+    const dTotal = collectedChroms.reduce((s, c) => s + c.drug_hits,    0);
+    const found  = collectedChroms.filter(c => c.has_findings).length;
 
-    // Animate through each chromosome one by one
-    for (let i = 0; i < total; i++) {
-      const c = chroms[i];
-      const p = Math.round(((i + 1) / total) * 100);
-
-      bar.style.width   = p + '%';
-      pct.textContent   = p + '%';
-      label.textContent = `Checking chromosome ${c.display} — ${c.snp_count.toLocaleString()} SNPs`;
-
-      // Mark current as scanning, previous as done
-      if (i > 0) ChromScanner._setDone(chroms[i - 1], i - 1);
-      ChromScanner._setScanning(c, i);
-
-      await ChromScanner._delay(i < 22 ? 180 : 260);  // slight pause for sex/MT chroms
-    }
-
-    // Mark last as done
-    ChromScanner._setDone(chroms[total - 1], total - 1);
-
-    // Final summary
-    const wTotal = chroms.reduce((s, c) => s + c.wellness_hits, 0);
-    const dTotal = chroms.reduce((s, c) => s + c.drug_hits, 0);
-    const found  = chroms.filter(c => c.has_findings).length;
-    label.textContent = `✅ Complete — ${found} chromosomes with findings`;
     bar.style.width = '100%';
     pct.textContent = '100%';
+    label.textContent = `✅ Done — ${found} chromosomes with findings`;
 
     document.getElementById('chrom-scan-summary').innerHTML =
-      `<strong>${data.total_snps.toLocaleString()}</strong> SNPs across <strong>${total}</strong> chromosomal strands &nbsp;·&nbsp;` +
-      `<span style="color:#6366f1"><strong>${wTotal}</strong> wellness</span> &nbsp;·&nbsp;` +
+      `<strong>${totalSnps.toLocaleString()}</strong> SNPs across <strong>${totalChroms}</strong> chromosomes &nbsp;·&nbsp;` +
+      `<span style="color:#6366f1"><strong>${wTotal}</strong> wellness hits</span> &nbsp;·&nbsp;` +
       `<span style="color:#f59e0b"><strong>${dTotal}</strong> drug matches</span>`;
 
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = '🔬 Re-scan';
+    ChromScanner._scanning = false;
   },
 
-  _delay(ms) { return new Promise(r => setTimeout(r, ms)); },
+  // Build 25 pending placeholder slots immediately (before any data arrives)
+  _buildPlaceholders(total) {
+    const SIZES  = [249,242,198,190,182,171,159,145,138,134,134,133,114,107,102,90,83,80,59,63,47,51,155,57,8];
+    const LABELS = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y','MT'];
+    const grid   = document.getElementById('chrom-grid');
+    const strip  = document.getElementById('karyotype-strip');
 
-  _buildGrid(chroms, activeIdx) {
-    const grid = document.getElementById('chrom-grid');
-    grid.innerHTML = chroms.map((c, i) => `
-      <div class="chrom-block pending" id="cb-${i}" title="Chromosome ${c.display}: ${c.snp_count.toLocaleString()} SNPs">
+    const gridFrag  = document.createDocumentFragment();
+    const stripFrag = document.createDocumentFragment();
+
+    for (let i = 0; i < total; i++) {
+      const lbl = LABELS[i] || String(i + 1);
+      const h   = Math.round(28 + ((SIZES[i] || 50) / 249) * 44);
+
+      // Grid card placeholder
+      const card = document.createElement('div');
+      card.className = 'chrom-block pending';
+      card.id = `cb-${i}`;
+      card.title = `Chromosome ${lbl}`;
+      card.innerHTML = `
         <div class="chrom-scan-line"></div>
-        <div class="chrom-name">chr${c.display}</div>
-        <div class="chrom-snp-count">${c.snp_count.toLocaleString()} SNPs</div>
-        <div class="chrom-badges" id="cbadge-${i}"></div>
-      </div>
-    `).join('');
-    ChromScanner._buildKaryotype(chroms, null);
+        <div class="chrom-name">chr${lbl}</div>
+        <div class="chrom-snp-count">loading…</div>
+        <div class="chrom-badges" id="cbadge-${i}"></div>`;
+      gridFrag.appendChild(card);
+
+      // Karyotype pill placeholder
+      const pill = document.createElement('div');
+      pill.className = 'karyotype-pill';
+      pill.id = `kp-${i}`;
+      pill.title = `Chr ${lbl}`;
+      pill.onclick = () => ChromScanner._selectChrom(i);
+      pill.innerHTML = `
+        <div class="karyotype-bar state-pending" id="kpbar-${i}" style="height:${h}px"></div>
+        <div class="karyotype-label">${lbl}</div>`;
+      stripFrag.appendChild(pill);
+    }
+
+    grid.appendChild(gridFrag);
+    strip.appendChild(stripFrag);
   },
 
-  _setScanning(c, i) {
-    const el = document.getElementById(`cb-${i}`);
-    if (!el) return;
-    el.className = 'chrom-block scanning';
-    ChromScanner._updateKaryotype(i, 'scanning');
-  },
-
-  _setDone(c, i) {
+  // Fill in a single chromosome slot with real data as it streams in
+  _revealChrom(c, i) {
     const el    = document.getElementById(`cb-${i}`);
     const badge = document.getElementById(`cbadge-${i}`);
+
     if (!el) return;
 
-    let cls = 'chrom-block done-none';
-    let stateStr = 'none';
-    let badges = '';
-
+    // Determine state
+    let cls = 'chrom-block done-none', state = 'none', badges = '';
     if (c.wellness_hits > 0 && c.drug_hits > 0) {
-      cls = 'chrom-block done-both';
-      stateStr = 'both';
+      cls = 'chrom-block done-both'; state = 'both';
       badges = `<span class="chrom-badge chrom-badge-w">W ${c.wellness_hits}</span><span class="chrom-badge chrom-badge-d">D ${c.drug_hits}</span>`;
     } else if (c.wellness_hits > 0) {
-      cls = 'chrom-block done-findings';
-      stateStr = 'findings';
+      cls = 'chrom-block done-findings'; state = 'findings';
       badges = `<span class="chrom-badge chrom-badge-w">W ${c.wellness_hits}</span>`;
     } else if (c.drug_hits > 0) {
-      cls = 'chrom-block done-drugs';
-      stateStr = 'drugs';
+      cls = 'chrom-block done-drugs'; state = 'drugs';
       badges = `<span class="chrom-badge chrom-badge-d">D ${c.drug_hits}</span>`;
     }
 
-    el.className = cls;
-    if (badge) badge.innerHTML = badges;
-    ChromScanner._updateKaryotype(i, stateStr);
-  },
+    // Update title and SNP count
+    el.title = `Chromosome ${c.display}: ${c.snp_count.toLocaleString()} SNPs`;
+    const snpEl = el.querySelector('.chrom-snp-count');
+    if (snpEl) snpEl.textContent = c.snp_count.toLocaleString() + ' SNPs';
 
-  _buildKaryotype(chroms, states) {
-    // states = map of index → 'pending'|'scanning'|'findings'|'drugs'|'both'|'none'
-    const SIZES = [249,242,198,190,182,171,159,145,138,134,134,133,114,107,102,90,83,80,59,63,47,51,155,57,8];
-    const strip = document.getElementById('karyotype-strip');
-    if (!strip) return;
-    strip.innerHTML = chroms.map((c, i) => {
-      const h = Math.round(28 + (SIZES[i] / 249) * 44);
-      const state = (states && states[i]) || 'pending';
-      return `
-        <div class="karyotype-pill" id="kp-${i}" onclick="ChromScanner._selectChrom(${i})" title="Chr ${c.display}: ${c.snp_count.toLocaleString()} SNPs">
-          <div class="karyotype-bar state-${state}" id="kpbar-${i}" style="height:${h}px"></div>
-          <div class="karyotype-label">${c.display}</div>
-        </div>`;
-    }).join('');
+    // Brief "scanning" flash, then settle to final state
+    el.className = 'chrom-block scanning';
+    ChromScanner._updateKaryotype(i, 'scanning');
+    setTimeout(() => {
+      el.className = cls;
+      if (badge) badge.innerHTML = badges;
+      ChromScanner._updateKaryotype(i, state);
+    }, 220);
   },
 
   _selectChrom(i) {
     document.querySelectorAll('.karyotype-pill').forEach((p, j) => p.classList.toggle('active', j === i));
-    // scroll the chrom-grid to highlight the selected block
     const block = document.getElementById('cb-' + i);
-    if (block) block.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    if (block) block.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   },
 
   _updateKaryotype(i, state) {
@@ -3672,9 +4051,7 @@ const ChromScanner = {
     if (bar) bar.className = 'karyotype-bar state-' + state;
   },
 
-  // Auto-start when profile is loaded
-  init() {
-  },
+  init() {},
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -3797,6 +4174,7 @@ const MicrobiomeUI = {
 
 const MedUI = {
   _key: 'healthagent_medicines',
+  _tagCache: {}, // drugName (lowercase) → [{cls, label, tip}]
 
   load() {
     try { return JSON.parse(localStorage.getItem(this._key) || '[]'); } catch { return []; }
@@ -3804,6 +4182,21 @@ const MedUI = {
 
   save(list) {
     localStorage.setItem(this._key, JSON.stringify(list));
+  },
+
+  // Called by MedDNA after resolving tags for a drug name
+  setTags(drugName, tags) {
+    this._tagCache[drugName.toLowerCase()] = tags;
+    this.render();
+  },
+
+  _pillsHtml(drugName) {
+    const tags = this._tagCache[drugName.toLowerCase()];
+    if (!tags || !tags.length) return '';
+    const pills = tags.map(t =>
+      `<span class="med-row-pill ${_esc(t.cls)}" data-tip="${_esc(t.tip)}">${_esc(t.label)}</span>`
+    ).join('');
+    return `<div class="med-row-pills">${pills}</div>`;
   },
 
   add(event) {
@@ -3819,12 +4212,14 @@ const MedUI = {
     this.save(list);
     form.reset();
     this.render();
+    MedDNA.lookup(name);
   },
 
   remove(id) {
     const list = this.load().filter(m => m.id !== id);
     this.save(list);
     this.render();
+    if (!this.load().length) MedDNA.clear();
   },
 
   render() {
@@ -3834,16 +4229,27 @@ const MedUI = {
       wrap.innerHTML = '<div class="med-empty">No medications added yet. Use the form above to add your first medication.</div>';
       return;
     }
-    wrap.innerHTML = list.map(m => `
-      <div class="med-row">
+    const frag = document.createDocumentFragment();
+    list.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'med-row';
+      row.innerHTML = `
         <div class="med-icon">💊</div>
         <div class="med-info">
           <div class="med-name">${_esc(m.name)}</div>
           <div class="med-dose">${_esc(m.dose)} ${_esc(m.unit)}${m.freq ? ' · ' + _esc(m.freq) : ''}</div>
         </div>
-        <button class="med-del" onclick="MedUI.remove(${m.id})">Remove</button>
-      </div>
-    `).join('');
+        <button class="med-del" onclick="MedUI.lookupAndRemove(${m.id})">Remove</button>
+        ${this._pillsHtml(m.name)}
+      `;
+      frag.appendChild(row);
+    });
+    wrap.innerHTML = '';
+    wrap.appendChild(frag);
+  },
+
+  lookupAndRemove(id) {
+    this.remove(id);
   },
 };
 
@@ -3959,6 +4365,186 @@ const ProfileUI = {
 function _esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  MEDICINE — DNA drug match lookup → single paragraph summary
+// ═══════════════════════════════════════════════════════════════════
+const MedDNA = {
+  async lookup(drugName) {
+    const section   = document.getElementById('med-dna-section');
+    const resultsEl = document.getElementById('med-dna-results');
+    if (!drugName) return;
+    section.style.display = 'block';
+    resultsEl.innerHTML = '<div class="med-no-match">Checking your DNA against the pharmacogenomics database…</div>';
+    try {
+      const data = await apiFetch('/api/drugs/search?q=' + encodeURIComponent(drugName));
+      if (!data.results || !data.results.length) {
+        resultsEl.innerHTML = `<div class="med-no-match">No pharmacogenomic data found for <strong>${_esc(drugName)}</strong> in the database. This does not mean the medication is unsafe — it simply means there are no recorded gene-drug interactions for it in the PharmGKB dataset.</div>`;
+        return;
+      }
+      resultsEl.innerHTML = '';
+      resultsEl.appendChild(this._buildSummary(drugName, data.results));
+    } catch(e) {
+      resultsEl.innerHTML = '<div class="med-no-match">Could not connect to database.</div>';
+    }
+  },
+
+  _buildSummary(drugName, results) {
+    // Group findings by broad category
+    const CAT = {
+      metabolism: [], efficacy: [], toxicity: [], dosing: [], other: []
+    };
+    const genes = new Set();
+
+    results.forEach(r => {
+      const cat = (r.category || '').toLowerCase();
+      const gene = (r.gene || '').split(';')[0].trim();
+      if (gene) genes.add(gene);
+      if (/metabolis|process|pk|pharmacokinetic|slow|rapid|fast|ultra|intermediate/.test(cat + ' ' + (r.phenotype || '')))
+        CAT.metabolism.push(r);
+      else if (/efficacy|response|effective|work/.test(cat))
+        CAT.efficacy.push(r);
+      else if (/toxic|side.effect|adverse|risk|haemorrhage|hemorrhage/.test(cat + ' ' + (r.phenotype || '')))
+        CAT.toxicity.push(r);
+      else if (/dose|dosing/.test(cat))
+        CAT.dosing.push(r);
+      else
+        CAT.other.push(r);
+    });
+
+    const drug = _esc(drugName);
+    const geneList = [...genes].slice(0, 5).map(_esc).join(', ');
+    const total = results.length;
+
+    // Build the paragraph sentence by sentence
+    const sentences = [];
+
+    // Opening — what we found
+    sentences.push(`Your DNA has been matched against ${total} pharmacogenomic record${total !== 1 ? 's' : ''} for ${drug}.`);
+
+    // Metabolism
+    if (CAT.metabolism.length) {
+      const r = CAT.metabolism[0];
+      const ph = (r.phenotype || '').toLowerCase();
+      if (/poor|slow|decreased|reduced/.test(ph))
+        sentences.push(`Based on your genetic profile, your body is likely to break down ${drug} more slowly than average, which means it may build up to higher levels in your bloodstream — your doctor may consider a lower starting dose.`);
+      else if (/rapid|ultra|fast|increased/.test(ph))
+        sentences.push(`Your genes suggest your body processes ${drug} faster than average, so the medication may clear your system more quickly and potentially wear off sooner than expected.`);
+      else if (/intermediate/.test(ph))
+        sentences.push(`Your genetic variants indicate you process ${drug} at a slightly below-average rate, which may subtly affect how long the medication stays active in your body.`);
+      else
+        sentences.push(`Your genetic variants in the genes that process ${drug} may affect how quickly your body absorbs and clears this medication.`);
+    }
+
+    // Efficacy
+    if (CAT.efficacy.length) {
+      sentences.push(`Research also links your genetic profile to differences in how well ${drug} works for you — it may be more or less effective compared to the average person, and your prescriber may want to monitor your response closely.`);
+    }
+
+    // Toxicity / side effects
+    if (CAT.toxicity.length) {
+      const conds = [...new Set(CAT.toxicity.map(r => (r.phenotype || '').split(';')[0].trim()).filter(Boolean))].slice(0, 2);
+      if (conds.length)
+        sentences.push(`Your DNA is associated with a potentially higher risk of certain side effects with ${drug}${conds.length ? ', including ' + conds.map(_esc).join(' and ') : ''} — if you experience anything unusual, tell your healthcare provider immediately.`);
+      else
+        sentences.push(`Some of your genetic variants have been linked to an increased risk of side effects with ${drug}, so it is worth being aware of how you feel when you start taking it.`);
+    }
+
+    // Dosing
+    if (CAT.dosing.length) {
+      sentences.push(`Your genetic profile suggests that a standard dose of ${drug} may not be the right starting point for you — your doctor may want to adjust the amount based on these findings.`);
+    }
+
+    // Genes involved footer sentence
+    if (geneList) {
+      sentences.push(`The genes involved in these interactions include ${geneList}${genes.size > 5 ? ' and others' : ''}.`);
+    }
+
+    // Closing
+    sentences.push(`Always discuss this information with your doctor or pharmacist before making any changes to your medication.`);
+
+    // Assemble tag badges with tooltips
+    const _TIPS = {
+      metabolism: 'Your genes affect how fast your body breaks down this medication — influencing blood levels and duration of effect.',
+      efficacy:   'Your genetic profile may affect how well this medication works for you compared to the average person.',
+      toxicity:   'Your DNA is linked to a potentially higher risk of side effects or adverse reactions with this medication.',
+      dosing:     'A standard dose may not be appropriate for you — your genetics suggest your prescriber may need to adjust the amount.',
+    };
+    const tags = [];
+    if (CAT.metabolism.length) tags.push({cls:'metabolism', label:'Metabolism',      tip: _TIPS.metabolism});
+    if (CAT.efficacy.length)   tags.push({cls:'efficacy',   label:'Effectiveness',   tip: _TIPS.efficacy});
+    if (CAT.toxicity.length)   tags.push({cls:'toxicity',   label:'Side Effect Risk',tip: _TIPS.toxicity});
+    if (CAT.dosing.length)     tags.push({cls:'dosing',     label:'Dosing',          tip: _TIPS.dosing});
+
+    // Push tags into the medicine row card
+    MedUI.setTags(drugName, tags);
+
+    const card = document.createElement('div');
+    card.className = 'med-summary-card';
+    card.innerHTML = `
+      <div class="med-summary-drug">💊 ${drug}</div>
+      <p class="med-summary-para">${sentences.join(' ')}</p>
+      ${tags.length ? `<div class="med-summary-tags">${tags.map(t => `<span class="med-summary-tag ${t.cls}" title="${_esc(t.tip)}">${_esc(t.label)}</span>`).join('')}</div>` : ''}
+      ${geneList ? `<div class="med-summary-genes">Genes: ${geneList}${genes.size > 5 ? ` +${genes.size - 5} more` : ''}</div>` : ''}
+    `;
+    return card;
+  },
+
+  clear() {
+    const section = document.getElementById('med-dna-section');
+    if (section) section.style.display = 'none';
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  DB STATUS FOOTER
+// ═══════════════════════════════════════════════════════════════════
+const DBFooter = {
+  _loaded: false,
+
+  async load() {
+    if (this._loaded) return;
+    const footer = document.getElementById('db-status-footer');
+    if (!footer) return;
+    try {
+      const data = await apiFetch('/api/db/summary');
+      const grid = footer.querySelector('.db-footer-grid');
+      const meta = footer.querySelector('.db-footer-meta');
+      if (!data || !data.tables) return;
+
+      const frag = document.createDocumentFragment();
+      data.tables.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'db-footer-row';
+        const hasData = t.records > 0;
+        const count = t.records > 0 ? t.records.toLocaleString() : 'empty';
+        const updated = t.last_updated ? t.last_updated.replace('T', ' ').slice(0, 16) : '—';
+        row.innerHTML = `
+          <div class="db-footer-dot ${hasData ? 'has-data' : 'no-data'}"></div>
+          <div class="db-footer-label">${_esc(t.label)}</div>
+          <div class="db-footer-count">${count}</div>
+        `;
+        row.title = `Last updated: ${updated}`;
+        frag.appendChild(row);
+      });
+      grid.innerHTML = '';
+      grid.appendChild(frag);
+
+      let metaTxt = '';
+      if (data.next_update) metaTxt += `Next scheduled update: ${_esc(data.next_update)}`;
+      else metaTxt += 'Databases update automatically every ' + (data.update_interval_h || 24) + ' hours';
+      meta.textContent = metaTxt;
+      this._loaded = true;
+    } catch(e) { /* silent */ }
+  },
+};
 </script>
+
+<!-- ── DB Status Footer ───────────────────────────────────────────── -->
+<footer id="db-status-footer" style="display:none">
+  <div class="db-footer-title">📦 Genomic Databases</div>
+  <div class="db-footer-grid"></div>
+  <div class="db-footer-meta">Loading…</div>
+</footer>
 </body>
 </html>
