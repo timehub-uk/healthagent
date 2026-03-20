@@ -19,6 +19,10 @@ from healthagent.databases.downloader import (
     download_gwas,
     download_clinvar,
     download_pharmgkb,
+    download_disgenet,
+    download_ensembl_consequences,
+    download_finngen,
+    download_opentargets,
 )
 from healthagent.health_traits import analyze_profile
 
@@ -90,11 +94,27 @@ async def _db_update_loop():
 
 
 def _run_full_update():
-    """Run all database downloads synchronously (called from executor)."""
+    """Run all database downloads synchronously (called from executor).
+
+    Order is deliberate:
+      1. Wellness traits seed  — fast, always safe, curated data
+      2. Ensembl VEP           — annotates our tracked SNPs first (small, fast)
+      3. GWAS Catalog          — large bulk download
+      4. ClinVar               — large bulk download
+      5. PharmGKB              — medium, drug interactions
+      6. DisGeNET              — gene-disease scored associations
+      7. OpenTargets           — GraphQL per-gene queries (rate-limited)
+      8. FinnGen               — biobank phenome per-SNP queries (rate-limited)
+    """
     local_db.init_db()
+    seed_wellness_traits(progress_cb=log.info)
+    download_ensembl_consequences(progress_cb=log.info)
     download_gwas(progress_cb=log.info)
     download_clinvar(progress_cb=log.info)
     download_pharmgkb(progress_cb=log.info)
+    download_disgenet(progress_cb=log.info)
+    download_opentargets(progress_cb=log.info)
+    download_finngen(progress_cb=log.info)
     log.info("[DB] Scheduled database refresh complete.")
 
 

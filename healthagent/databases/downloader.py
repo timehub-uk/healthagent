@@ -1,9 +1,13 @@
 """Open-source genomics database downloader.
 
 Downloads and ingests data from:
-  - GWAS Catalog (EBI)  : SNP → trait/disease associations
-  - ClinVar (NCBI)      : SNP → clinical significance
-  - PharmGKB            : gene/SNP → drug interactions
+  - GWAS Catalog (EBI)      : SNP → trait/disease associations
+  - ClinVar (NCBI)          : SNP → clinical significance
+  - PharmGKB                : gene/SNP → drug interactions
+  - DisGeNET                : gene → disease associations (scored)
+  - OpenTargets Platform    : gene → disease evidence (multi-source)
+  - Ensembl REST API        : variant functional consequences (per-SNP)
+  - FinnGen / UK Biobank    : large-scale biobank phenome associations
 
 All data is stored in the local SQLite database (data/healthagent.db).
 Each source can be downloaded independently or all at once.
@@ -13,6 +17,10 @@ Usage:
     python -m healthagent.databases.downloader --gwas
     python -m healthagent.databases.downloader --clinvar
     python -m healthagent.databases.downloader --pharmgkb
+    python -m healthagent.databases.downloader --disgenet
+    python -m healthagent.databases.downloader --opentargets
+    python -m healthagent.databases.downloader --ensembl
+    python -m healthagent.databases.downloader --finngen
     python -m healthagent.databases.downloader --status
 """
 
@@ -48,6 +56,25 @@ PHARMGKB_RELATIONSHIPS_URL = (
 PHARMGKB_VARIANTS_URL = (
     "https://api.pharmgkb.org/v1/download/file/data/clinicalAnnotations.zip"
 )
+
+# DisGeNET — gene-disease associations (all sources, CC BY-NC-SA 4.0)
+DISGENET_ALL_URL = (
+    "https://www.disgenet.org/static/disgenet_ap1/files/downloads/all_gene_disease_associations.tsv.gz"
+)
+
+# OpenTargets — overall association scores (Apache 2.0, Parquet/JSON)
+# We use the smaller JSON summary file rather than full Parquet
+OPENTARGETS_ASSOC_URL = (
+    "https://ftp.ebi.ac.uk/pub/databases/opentargets/platform/latest/output/etl/json/associationByOverallDirect/"
+)
+
+# FinnGen summary statistics endpoint (R10 public release)
+FINNGEN_MANIFEST_URL = (
+    "https://r10.finngen.fi/api/phenos"
+)
+
+# Ensembl REST API base (per-variant queries, no bulk download needed)
+ENSEMBL_REST_BASE = "https://rest.ensembl.org"
 
 
 def _fetch(url: str, label: str, cache_name: str) -> Path:
@@ -804,6 +831,411 @@ def seed_wellness_traits(progress_cb: Callable[[str], None] = print) -> int:
 #  CLI entry point
 # ═══════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════
+#  DISGENET
+# ═══════════════════════════════════════════════════════════════════
+
+def download_disgenet(progress_cb: Callable[[str], None] = print) -> int:
+    """Download DisGeNET gene-disease associations.
+
+    What it is:
+        DisGeNET aggregates gene-disease associations from curated databases
+        (OMIM, Orphanet, ClinVar, UniProt) and text-mined literature, scoring
+        each association by evidence quality (0–1 score).
+
+    Why it matters for users:
+        It enriches trait cards with disease context — not just which gene is
+        involved, but which diseases that gene has been scientifically linked to,
+        giving users a broader picture of their genetic health landscape.
+
+    Returns:
+        Number of association records inserted.
+    """
+    local_db.log_download("disgenet", "started")
+    progress_cb("[DisGeNET] Downloading gene-disease associations...")
+
+    try:
+        path = _fetch(DISGENET_ALL_URL, "DisGeNET", "disgenet_associations.tsv.gz")
+    except Exception as e:
+        local_db.log_download("disgenet", "failed", error=str(e))
+        progress_cb(f"[DisGeNET] Download failed: {e}")
+        return 0
+
+    progress_cb("[DisGeNET] Parsing associations...")
+
+    # Columns: geneId, geneSymbol, DSI, DPI, diseaseId, diseaseName,
+    #          diseaseType, diseaseClass, diseaseSemanticType, score,
+    #          EI, YearInitial, YearFinal, NofPmids, NofSnps, source
+
+    rows_to_insert = []
+    count = 0
+
+    with _open_maybe_gz(path) as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            gene = row.get("geneSymbol", "").strip()
+            disease = row.get("diseaseName", "").strip()
+            if not gene or not disease:
+                continue
+
+            try:
+                score = float(row.get("score", 0) or 0)
+            except ValueError:
+                score = 0.0
+
+            # Only keep associations with meaningful evidence
+            if score < 0.1:
+                continue
+
+            try:
+                ei = float(row.get("EI", 0) or 0)
+            except ValueError:
+                ei = 0.0
+
+            rows_to_insert.append((
+                gene,
+                row.get("geneId", "").strip(),
+                disease,
+                row.get("diseaseId", "").strip(),
+                row.get("diseaseClass", "").strip(),
+                score,
+                ei,
+            ))
+            count += 1
+
+            if count % 20000 == 0:
+                progress_cb(f"[DisGeNET] Parsed {count:,} records...")
+
+    progress_cb(f"[DisGeNET] Inserting {len(rows_to_insert):,} associations...")
+    local_db.executemany(
+        """INSERT OR IGNORE INTO disgenet_association
+           (gene_symbol, gene_id, disease_name, disease_id, disease_class, score, ei)
+           VALUES (?,?,?,?,?,?,?)""",
+        rows_to_insert,
+    )
+
+    local_db.log_download("disgenet", "completed", records=count)
+    progress_cb(f"[DisGeNET] Done — {count:,} gene-disease associations stored.")
+    return count
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  ENSEMBL REST (per-SNP variant consequences)
+# ═══════════════════════════════════════════════════════════════════
+
+def download_ensembl_consequences(
+    rsids: list[str] = None,
+    progress_cb: Callable[[str], None] = print,
+) -> int:
+    """Query Ensembl REST API for functional consequences of tracked SNPs.
+
+    What it is:
+        The Ensembl Variant Effect Predictor (VEP) annotates each variant with
+        its predicted molecular impact: missense (amino acid change), synonymous,
+        splice region, regulatory region, etc. SIFT and PolyPhen scores predict
+        whether a missense change is damaging.
+
+    Why it matters for users:
+        It explains *how* a variant affects a gene — "this changes an amino acid
+        in the protein" is more meaningful than "this is a missense variant".
+
+    Args:
+        rsids: List of rsIDs to annotate. Uses tracked wellness SNPs if None.
+
+    Returns:
+        Number of consequence records inserted.
+    """
+    # Default to the wellness SNPs we track
+    if rsids is None:
+        rows = local_db.query("SELECT DISTINCT rsid FROM wellness_trait")
+        rsids = [r["rsid"] for r in rows]
+
+    if not rsids:
+        progress_cb("[Ensembl] No SNPs to annotate.")
+        return 0
+
+    local_db.log_download("ensembl", "started")
+    progress_cb(f"[Ensembl] Fetching VEP consequences for {len(rsids)} SNPs...")
+
+    rows_to_insert = []
+    # Ensembl allows batches of up to 200 rsIDs per POST
+    batch_size = 50
+
+    for i in range(0, len(rsids), batch_size):
+        batch = rsids[i: i + batch_size]
+        url   = f"{ENSEMBL_REST_BASE}/vep/human/id"
+        payload = json.dumps({"ids": batch}).encode()
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept":       "application/json",
+                "User-Agent":   "HealthAgent/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                results = json.loads(resp.read())
+        except Exception as e:
+            progress_cb(f"[Ensembl] Batch {i//batch_size + 1} failed: {e}")
+            continue
+
+        for variant in results:
+            rsid = variant.get("id", "")
+            for tc in variant.get("transcript_consequences", []):
+                conseqs = ",".join(tc.get("consequence_terms", []))
+                rows_to_insert.append((
+                    rsid,
+                    tc.get("gene_symbol", ""),
+                    tc.get("transcript_id", ""),
+                    conseqs,
+                    tc.get("impact", ""),
+                    tc.get("biotype", ""),
+                    tc.get("sift_prediction", ""),
+                    tc.get("polyphen_prediction", ""),
+                ))
+
+        time.sleep(0.34)   # Ensembl rate limit: ~3 req/s
+
+    progress_cb(f"[Ensembl] Inserting {len(rows_to_insert):,} consequence records...")
+    if rows_to_insert:
+        local_db.executemany(
+            """INSERT OR IGNORE INTO ensembl_consequence
+               (rsid, gene_symbol, transcript_id, consequence, impact,
+                biotype, sift_prediction, polyphen_pred)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            rows_to_insert,
+        )
+
+    local_db.log_download("ensembl", "completed", records=len(rows_to_insert))
+    progress_cb(f"[Ensembl] Done — {len(rows_to_insert):,} consequences stored.")
+    return len(rows_to_insert)
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  FINNGEN (public R10 phenome summary statistics)
+# ═══════════════════════════════════════════════════════════════════
+
+def download_finngen(progress_cb: Callable[[str], None] = print) -> int:
+    """Download FinnGen phenotype manifest and top SNP associations.
+
+    What it is:
+        FinnGen is a Finnish biobank study of ~500,000 participants linking
+        genomic data to health records. Their public R10 release includes
+        summary statistics for ~2,600 disease endpoints — one of the most
+        powerful biobank datasets in the world.
+
+    Why it matters for users:
+        FinnGen provides some of the most statistically robust associations
+        between SNPs and disease endpoints, particularly for autoimmune,
+        cardiovascular, and metabolic conditions common in Northern European
+        ancestry populations.
+
+    Returns:
+        Number of phenotype-SNP associations inserted.
+    """
+    local_db.log_download("finngen", "started")
+    progress_cb("[FinnGen] Fetching phenotype manifest from R10 release...")
+
+    # Fetch the phenotype manifest (JSON list of all studied endpoints)
+    try:
+        req = urllib.request.Request(
+            FINNGEN_MANIFEST_URL,
+            headers={"User-Agent": "HealthAgent/1.0", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            phenos = json.loads(resp.read())
+    except Exception as e:
+        local_db.log_download("finngen", "failed", error=str(e))
+        progress_cb(f"[FinnGen] Manifest fetch failed: {e}")
+        return 0
+
+    progress_cb(f"[FinnGen] Found {len(phenos)} phenotype endpoints.")
+
+    # For tracked wellness SNPs, query the FinnGen association API
+    snp_rows = local_db.query("SELECT DISTINCT rsid FROM wellness_trait")
+    tracked_rsids = [r["rsid"] for r in snp_rows]
+
+    rows_to_insert = []
+    count = 0
+    FINNGEN_ASSOC_BASE = "https://r10.finngen.fi/api/pheno"
+
+    for rsid in tracked_rsids:
+        try:
+            url = f"https://r10.finngen.fi/api/variants/{rsid}"
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "HealthAgent/1.0", "Accept": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read())
+        except Exception:
+            continue   # SNP not in FinnGen; skip silently
+
+        for assoc in data.get("phewas", [])[:20]:  # top 20 phenotypes per SNP
+            rows_to_insert.append((
+                rsid,
+                assoc.get("phenostring", ""),
+                assoc.get("category", ""),
+                "FinnGen R10",
+                assoc.get("num_cases"),
+                assoc.get("num_controls"),
+                assoc.get("pval"),
+                assoc.get("beta"),
+            ))
+            count += 1
+
+        time.sleep(0.2)
+
+    if rows_to_insert:
+        local_db.executemany(
+            """INSERT OR IGNORE INTO biobank_phenotype
+               (rsid, phenotype, phenotype_category, study_name,
+                n_cases, n_controls, p_value, beta, source)
+               VALUES (?,?,?,?,?,?,?,?,'finngen')""",
+            rows_to_insert,
+        )
+
+    local_db.log_download("finngen", "completed", records=count)
+    progress_cb(f"[FinnGen] Done — {count:,} phenotype associations stored.")
+    return count
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  OPENTARGETS (gene-disease association scores)
+# ═══════════════════════════════════════════════════════════════════
+
+def download_opentargets(progress_cb: Callable[[str], None] = print) -> int:
+    """Query OpenTargets Platform for gene-disease association scores.
+
+    What it is:
+        OpenTargets aggregates evidence from genetics, somatic mutations,
+        drugs, literature, and animal models to score gene-disease associations.
+        The platform integrates GWAS, ClinVar, ChEMBL, and 15 other sources.
+
+    Why it matters for users:
+        It gives a single composite 'confidence score' (0-1) for how strongly
+        a gene has been linked to a disease across *all* evidence types —
+        not just genetics, but also drugs, animal studies, and clinical data.
+
+    Returns:
+        Number of associations inserted.
+    """
+    local_db.log_download("opentargets", "started")
+    progress_cb("[OpenTargets] Querying gene-disease associations via GraphQL API...")
+
+    # Use the OpenTargets GraphQL API (no auth required, free tier)
+    GRAPHQL_URL = "https://api.platform.opentargets.org/api/v4/graphql"
+
+    # Get genes from tracked wellness SNPs
+    snp_rows = local_db.query(
+        "SELECT DISTINCT gene FROM wellness_trait WHERE gene IS NOT NULL AND gene != ''"
+    )
+    genes = [r["gene"] for r in snp_rows]
+
+    if not genes:
+        progress_cb("[OpenTargets] No genes to query.")
+        local_db.log_download("opentargets", "completed", records=0)
+        return 0
+
+    rows_to_insert = []
+    count = 0
+
+    QUERY = """
+    query GeneAssociations($symbol: String!) {
+      target(ensemblId: $symbol) {
+        approvedSymbol
+        id
+        associatedDiseases(page: {index: 0, size: 20}) {
+          rows {
+            disease { name id }
+            score
+            datatypeScores {
+              id score
+            }
+          }
+        }
+      }
+    }
+    """
+
+    # Also try by gene symbol using search
+    SEARCH_QUERY = """
+    query SearchGene($q: String!) {
+      search(queryString: $q, entityNames: ["target"], page: {index: 0, size: 1}) {
+        hits { id object { ... on Target { approvedSymbol } } }
+      }
+    }
+    """
+
+    for gene in genes:
+        # First resolve gene symbol → Ensembl ID
+        try:
+            payload = json.dumps({"query": SEARCH_QUERY, "variables": {"q": gene}}).encode()
+            req = urllib.request.Request(
+                GRAPHQL_URL,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "HealthAgent/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                result = json.loads(resp.read())
+
+            hits = result.get("data", {}).get("search", {}).get("hits", [])
+            if not hits:
+                continue
+            ensembl_id = hits[0].get("id", "")
+        except Exception:
+            continue
+
+        # Fetch associations using Ensembl ID
+        try:
+            payload = json.dumps({"query": QUERY, "variables": {"symbol": ensembl_id}}).encode()
+            req = urllib.request.Request(
+                GRAPHQL_URL,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "HealthAgent/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                result = json.loads(resp.read())
+
+            target = result.get("data", {}).get("target") or {}
+            assoc_diseases = target.get("associatedDiseases", {}).get("rows", [])
+
+            for assoc in assoc_diseases:
+                disease = assoc.get("disease", {})
+                scores  = {s["id"]: s["score"] for s in assoc.get("datatypeScores", [])}
+                rows_to_insert.append((
+                    gene, ensembl_id,
+                    disease.get("name", ""),
+                    disease.get("id", ""),
+                    assoc.get("score", 0),
+                    scores.get("genetic_association", 0),
+                    scores.get("somatic_mutation", 0),
+                    scores.get("known_drug", 0),
+                    scores.get("literature", 0),
+                ))
+                count += 1
+
+        except Exception:
+            pass
+
+        time.sleep(0.5)   # be polite to the API
+
+    if rows_to_insert:
+        local_db.executemany(
+            """INSERT OR IGNORE INTO opentargets_association
+               (gene_symbol, ensembl_id, disease_name, disease_id,
+                overall_score, genetic_score, somatic_score, drug_score, literature_score)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            rows_to_insert,
+        )
+
+    local_db.log_download("opentargets", "completed", records=count)
+    progress_cb(f"[OpenTargets] Done — {count:,} gene-disease associations stored.")
+    return count
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description="HealthAgent database downloader")
@@ -811,8 +1243,12 @@ def main() -> None:
     parser.add_argument("--gwas",     action="store_true", help="Download GWAS Catalog")
     parser.add_argument("--clinvar",  action="store_true", help="Download ClinVar")
     parser.add_argument("--pharmgkb", action="store_true", help="Download PharmGKB")
-    parser.add_argument("--wellness", action="store_true", help="Seed wellness traits")
-    parser.add_argument("--status",   action="store_true", help="Show DB stats")
+    parser.add_argument("--wellness",    action="store_true", help="Seed wellness traits")
+    parser.add_argument("--disgenet",    action="store_true", help="Download DisGeNET")
+    parser.add_argument("--ensembl",     action="store_true", help="Fetch Ensembl VEP consequences")
+    parser.add_argument("--finngen",     action="store_true", help="Download FinnGen R10 associations")
+    parser.add_argument("--opentargets", action="store_true", help="Download OpenTargets associations")
+    parser.add_argument("--status",      action="store_true", help="Show DB stats")
     args = parser.parse_args()
 
     local_db.init_db()
@@ -835,6 +1271,18 @@ def main() -> None:
 
     if args.pharmgkb or args.all:
         download_pharmgkb()
+
+    if args.disgenet or args.all:
+        download_disgenet()
+
+    if args.ensembl or args.all:
+        download_ensembl_consequences()
+
+    if args.finngen or args.all:
+        download_finngen()
+
+    if args.opentargets or args.all:
+        download_opentargets()
 
 
 if __name__ == "__main__":

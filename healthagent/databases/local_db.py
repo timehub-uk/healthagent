@@ -164,10 +164,75 @@ def get_drug_interactions(rsids: list[str] = None, genes: list[str] = None) -> l
     return [dict(r) for r in rows]
 
 
+def get_disgenet_diseases(genes: list[str], min_score: float = 0.2) -> list[dict]:
+    """Return top DisGeNET gene-disease associations for given genes."""
+    if not genes:
+        return []
+    ph = ",".join("?" * len(genes))
+    rows = query(
+        f"""SELECT gene_symbol, disease_name, disease_class, score, ei
+            FROM disgenet_association
+            WHERE gene_symbol IN ({ph}) AND score >= ?
+            ORDER BY score DESC LIMIT {len(genes) * 5}""",
+        tuple(genes) + (min_score,),
+    )
+    return [dict(r) for r in rows]
+
+
+def get_opentargets(genes: list[str]) -> list[dict]:
+    """Return OpenTargets gene-disease associations for given genes."""
+    if not genes:
+        return []
+    ph = ",".join("?" * len(genes))
+    rows = query(
+        f"""SELECT gene_symbol, disease_name, overall_score,
+                   genetic_score, drug_score
+            FROM opentargets_association
+            WHERE gene_symbol IN ({ph})
+            ORDER BY overall_score DESC LIMIT {len(genes) * 5}""",
+        tuple(genes),
+    )
+    return [dict(r) for r in rows]
+
+
+def get_ensembl_consequences(rsids: list[str]) -> list[dict]:
+    """Return Ensembl VEP consequences for given rsids."""
+    if not rsids:
+        return []
+    ph = ",".join("?" * len(rsids))
+    rows = query(
+        f"""SELECT rsid, gene_symbol, consequence, impact,
+                   sift_prediction, polyphen_pred
+            FROM ensembl_consequence
+            WHERE rsid IN ({ph}) AND impact IN ('HIGH','MODERATE')
+            ORDER BY
+                CASE impact WHEN 'HIGH' THEN 1 WHEN 'MODERATE' THEN 2 ELSE 3 END""",
+        tuple(rsids),
+    )
+    return [dict(r) for r in rows]
+
+
+def get_biobank_phenotypes(rsids: list[str]) -> list[dict]:
+    """Return biobank phenotype associations for given rsids."""
+    if not rsids:
+        return []
+    ph = ",".join("?" * len(rsids))
+    rows = query(
+        f"""SELECT rsid, phenotype, phenotype_category, study_name,
+                   n_cases, p_value, beta
+            FROM biobank_phenotype
+            WHERE rsid IN ({ph})
+            ORDER BY p_value ASC LIMIT {len(rsids) * 5}""",
+        tuple(rsids),
+    )
+    return [dict(r) for r in rows]
+
+
 def get_db_stats() -> dict:
     """Return row counts per table for status reporting."""
-    tables = ["snp", "gwas_association", "clinvar_variant",
-              "drug_interaction", "wellness_trait", "download_log"]
+    tables = ["snp", "gwas_association", "clinvar_variant", "drug_interaction",
+              "wellness_trait", "disgenet_association", "opentargets_association",
+              "ensembl_consequence", "biobank_phenotype", "download_log"]
     stats = {}
     for t in tables:
         try:

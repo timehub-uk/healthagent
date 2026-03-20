@@ -92,19 +92,47 @@ def analyze_profile(profile: "DNAProfile") -> dict:
             "severity_color":     _clinvar_color(sig),
         })
 
-    # ── Drug interactions ─────────────────────────────────────────
-    # Gather gene names from DB for the profile's rsids
-    genes = []
+    # ── Gather gene names from all sources ────────────────────────
+    genes: list[str] = []
+    # From wellness_trait table (always populated)
+    wt_genes = local_db.query(
+        "SELECT DISTINCT gene FROM wellness_trait WHERE gene IS NOT NULL AND gene != ''"
+    )
+    genes = list({r["gene"] for r in wt_genes})
+    # Also from snp table if populated
     if rsid_list:
         ph = ",".join("?" * len(rsid_list))
-        rows = local_db.query(
+        snp_genes = local_db.query(
             f"SELECT DISTINCT gene FROM snp WHERE rsid IN ({ph}) AND gene != ''",
             tuple(rsid_list),
         )
-        genes = [r["gene"] for r in rows if r["gene"]]
+        genes = list(set(genes) | {r["gene"] for r in snp_genes if r["gene"]})
 
+    # ── Drug interactions ─────────────────────────────────────────
     drug_rows = local_db.get_drug_interactions(rsids=rsid_list, genes=genes)
     drugs = [dict(r) for r in drug_rows]
+
+    # ── DisGeNET gene-disease associations ────────────────────────
+    disgenet_rows = local_db.get_disgenet_diseases(genes, min_score=0.3)
+    disgenet = [dict(r) for r in disgenet_rows]
+
+    # ── OpenTargets gene-disease scores ──────────────────────────
+    opentargets_rows = local_db.get_opentargets(genes)
+    opentargets = [dict(r) for r in opentargets_rows]
+
+    # ── Ensembl VEP consequences ──────────────────────────────────
+    ensembl_rows = local_db.get_ensembl_consequences(rsid_list)
+    ensembl = []
+    for row in ensembl_rows:
+        ensembl.append({
+            **row,
+            "consequence_plain": _consequence_plain(row.get("consequence", "")),
+            "impact_color":      _impact_color(row.get("impact", "")),
+        })
+
+    # ── Biobank phenotypes (FinnGen etc.) ─────────────────────────
+    biobank_rows = local_db.get_biobank_phenotypes(rsid_list)
+    biobank = [dict(r) for r in biobank_rows]
 
     # ── Summary ───────────────────────────────────────────────────
     cat_counts: dict[str, int] = {}
@@ -125,11 +153,15 @@ def analyze_profile(profile: "DNAProfile") -> dict:
     }
 
     return {
-        "wellness": wellness,
-        "gwas":     gwas,
-        "clinvar":  clinvar,
-        "drugs":    drugs,
-        "summary":  summary,
+        "wellness":    wellness,
+        "gwas":        gwas,
+        "clinvar":     clinvar,
+        "drugs":       drugs,
+        "disgenet":    disgenet,
+        "opentargets": opentargets,
+        "ensembl":     ensembl,
+        "biobank":     biobank,
+        "summary":     summary,
     }
 
 
@@ -165,6 +197,37 @@ def _clinvar_plain(sig: str) -> str:
         if key in sig:
             return val
     return sig
+
+
+def _consequence_plain(consequence: str) -> str:
+    """Convert Ensembl consequence term to plain English."""
+    mapping = {
+        "missense_variant":           "Changes an amino acid in the protein",
+        "synonymous_variant":         "Same amino acid — silent change",
+        "stop_gained":                "Creates a premature stop codon",
+        "splice_region_variant":      "May affect how the gene is read",
+        "intron_variant":             "Located within a gene intron",
+        "regulatory_region_variant":  "Affects gene regulatory region",
+        "5_prime_UTR_variant":        "In the gene's start regulatory region",
+        "3_prime_UTR_variant":        "In the gene's end regulatory region",
+        "upstream_gene_variant":      "Near the start of a gene",
+        "downstream_gene_variant":    "Near the end of a gene",
+        "intergenic_variant":         "Between genes",
+        "non_coding_transcript_exon_variant": "In a non-coding RNA region",
+    }
+    for key, val in mapping.items():
+        if key in consequence:
+            return val
+    return consequence.replace("_", " ").capitalize() if consequence else "—"
+
+
+def _impact_color(impact: str) -> str:
+    return {
+        "HIGH":     "#f43f5e",
+        "MODERATE": "#f59e0b",
+        "LOW":      "#3b82f6",
+        "MODIFIER": "#6b7280",
+    }.get(impact, "#6b7280")
 
 
 def _clinvar_color(sig: str) -> str:
