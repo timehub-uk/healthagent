@@ -185,7 +185,7 @@
   }
   .tab-pane { display: none; flex: 1; }
   .tab-pane.active { display: flex; flex-direction: column; }
-  #strand-canvas, #gel-canvas {
+  #strand-canvas, #gel-canvas, #chroma-canvas {
     width: 100%;
     flex: 1;
     border-radius: 8px;
@@ -317,6 +317,18 @@
         <div>Stain colour follows mode above</div>
       </div>
     </div>
+
+    <div>
+      <h2>Chromatogram</h2>
+      <div class="legend" style="margin-top:.5rem;font-size:.78rem;gap:.4rem">
+        <div style="color:var(--muted)">Sanger sequencing trace</div>
+        <div class="legend-item"><span class="dot dot-A"></span> A — green trace</div>
+        <div class="legend-item"><span class="dot dot-T"></span> T — red trace</div>
+        <div class="legend-item"><span class="dot dot-G"></span> G — blue trace</div>
+        <div class="legend-item"><span class="dot dot-C"></span> C — amber trace</div>
+        <div style="color:var(--muted);font-size:.72rem;margin-top:.2rem">Peak height = fluorescence intensity<br>Base call letter at each peak apex<br>15% bleed into complement channel</div>
+      </div>
+    </div>
   </aside>
 
   <!-- Helix panel -->
@@ -339,6 +351,7 @@
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('strand',this)">Strand View</button>
       <button class="tab-btn"        onclick="switchTab('gel',this)">Gel Electrophoresis</button>
+      <button class="tab-btn"        onclick="switchTab('chromatogram',this)">Sequencing Chromatogram</button>
     </div>
     <div id="tab-strand" class="tab-pane active">
       <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Colorised sense / antisense nucleotide sequence</p>
@@ -347,6 +360,10 @@
     <div id="tab-gel" class="tab-pane">
       <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Agarose gel simulation — SNP density per chromosome under UV staining</p>
       <canvas id="gel-canvas"></canvas>
+    </div>
+    <div id="tab-chromatogram" class="tab-pane">
+      <p style="font-size:.75rem;color:var(--muted);margin-bottom:.3rem">Sanger sequencing electropherogram — fluorescence intensity traces per base</p>
+      <canvas id="chroma-canvas"></canvas>
     </div>
   </section>
 
@@ -1013,29 +1030,214 @@ function drawGel(canvas, snps) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  SANGER SEQUENCING CHROMATOGRAM RENDERER
+//
+//  Recreates the look of a Sanger/capillary sequencing electropherogram:
+//  • X-axis: nucleotide positions (scrolls with time)
+//  • Y-axis: fluorescence signal intensity (0–100%)
+//  • Four overlapping smooth Gaussian traces — one per base
+//    A=green  T=red  G=blue  C=amber  (same palette as helix)
+//  • Traces are additive; peaks are tallest at the called base position
+//  • Base call letters printed above each dominant peak
+//  • Faint vertical position ticks and Y-axis grid lines
+//  • Scrolls horizontally like a real sequencing output readout
+// ═══════════════════════════════════════════════════════════════════
+const CHROMA_BASES = ['A','T','G','C'];
+
+// Gaussian bell curve value at distance dx with given width σ
+function gauss(dx, sigma) {
+  return Math.exp(-(dx * dx) / (2 * sigma * sigma));
+}
+
+function drawChromatogram(canvas, snps, offsetPx) {
+  const ctx = canvas.getContext('2d');
+  const { w, h } = resizeCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+
+  // Background
+  ctx.fillStyle = '#050a0f';
+  ctx.fillRect(0, 0, w, h);
+
+  if (!snps.length) {
+    ctx.fillStyle = '#334';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Load a DNA file to see the sequencing trace', w / 2, h / 2);
+    return;
+  }
+
+  const PAD_L  = 42;   // left axis gutter
+  const PAD_T  = 30;   // top for base labels
+  const PAD_B  = 28;   // bottom for x-axis
+  const plotW  = w - PAD_L;
+  const plotH  = h - PAD_T - PAD_B;
+  const baseW  = 28;   // px per base position
+  const sigma  = baseW * 0.55;   // peak width (σ)
+
+  // Visible window in base units
+  const startBase = Math.floor(offsetPx / baseW);
+  const visiBases = Math.ceil(plotW / baseW) + 4;
+
+  // ── Y-axis grid ───────────────────────────────────────────────
+  ctx.strokeStyle = '#0e1e2e';
+  ctx.lineWidth   = 1;
+  ctx.font        = '8px monospace';
+  ctx.fillStyle   = '#2a4a6a';
+  ctx.textAlign   = 'right';
+  for (let pct = 0; pct <= 100; pct += 25) {
+    const yy = PAD_T + plotH * (1 - pct / 100);
+    ctx.beginPath();
+    ctx.moveTo(PAD_L, yy);
+    ctx.lineTo(w, yy);
+    ctx.stroke();
+    ctx.fillText(pct + '%', PAD_L - 3, yy + 3);
+  }
+
+  // Y-axis label
+  ctx.save();
+  ctx.translate(10, PAD_T + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle   = '#3a6080';
+  ctx.font        = '9px system-ui';
+  ctx.textAlign   = 'center';
+  ctx.fillText('Fluorescence intensity', 0, 0);
+  ctx.restore();
+
+  // ── Build signal arrays for each base channel ─────────────────
+  // For each pixel column, sum Gaussian contributions from nearby bases
+  const signals = { A: [], T: [], G: [], C: [] };
+  CHROMA_BASES.forEach(b => { signals[b] = new Float32Array(plotW); });
+
+  for (let px = 0; px < plotW; px++) {
+    const absBase = (offsetPx + px) / baseW;   // fractional base position
+
+    // Check nearby bases (within ±3 σ)
+    const nearStart = Math.max(0, Math.floor(absBase - 3));
+    const nearEnd   = Math.min(snps.length - 1, Math.ceil(absBase + 3));
+
+    for (let bi = nearStart; bi <= nearEnd; bi++) {
+      const snp  = snps[bi % snps.length];
+      const base = snp.genotype[0] || 'A';
+      const dx   = absBase - bi;
+      const amp  = gauss(dx, sigma / baseW);
+
+      // Primary base gets full amplitude; add minor bleed into complement
+      if (signals[base]) signals[base][px] = Math.max(signals[base][px], amp);
+
+      // Realistic bleed: ~15% signal leaks into complement channel
+      const comp = complement[base];
+      if (comp && signals[comp]) {
+        signals[comp][px] = Math.max(signals[comp][px], amp * 0.15);
+      }
+    }
+  }
+
+  // ── Draw each base trace ──────────────────────────────────────
+  CHROMA_BASES.forEach(base => {
+    const col = STAINS.natural[base];
+    ctx.beginPath();
+    for (let px = 0; px < plotW; px++) {
+      const intensity = signals[base][px];
+      const yy = PAD_T + plotH * (1 - intensity);
+      if (px === 0) ctx.moveTo(PAD_L + px, yy);
+      else          ctx.lineTo(PAD_L + px, yy);
+    }
+    ctx.strokeStyle = withAlpha(col, 0.85);
+    ctx.lineWidth   = 1.8;
+    ctx.lineJoin    = 'round';
+    ctx.stroke();
+
+    // Subtle fill under curve
+    ctx.beginPath();
+    ctx.moveTo(PAD_L, PAD_T + plotH);
+    for (let px = 0; px < plotW; px++) {
+      const yy = PAD_T + plotH * (1 - signals[base][px]);
+      ctx.lineTo(PAD_L + px, yy);
+    }
+    ctx.lineTo(PAD_L + plotW, PAD_T + plotH);
+    ctx.closePath();
+    ctx.fillStyle = withAlpha(col, 0.07);
+    ctx.fill();
+  });
+
+  // ── Base call labels above dominant peaks ─────────────────────
+  ctx.font      = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+
+  for (let bi = startBase; bi < startBase + visiBases && bi < snps.length; bi++) {
+    const snp  = snps[bi % snps.length];
+    const base = snp.genotype[0] || 'A';
+    const px   = PAD_L + bi * baseW - offsetPx;
+    if (px < PAD_L || px > w) continue;
+
+    // Peak label
+    ctx.fillStyle = STAINS.natural[base];
+    ctx.fillText(base, px, PAD_T - 4);
+
+    // Vertical tick at base position
+    ctx.strokeStyle = withAlpha(STAINS.natural[base], 0.18);
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(px, PAD_T);
+    ctx.lineTo(px, PAD_T + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── X-axis position numbers ───────────────────────────────────
+  ctx.fillStyle   = '#2a4a6a';
+  ctx.font        = '8px monospace';
+  ctx.textAlign   = 'center';
+  const tickEvery = Math.max(1, Math.round(50 / baseW));
+  for (let bi = startBase; bi < startBase + visiBases; bi += tickEvery) {
+    const px = PAD_L + bi * baseW - offsetPx;
+    if (px < PAD_L || px > w) continue;
+    ctx.fillText(bi + 1, px, h - 6);
+  }
+  ctx.fillStyle   = '#3a6080';
+  ctx.font        = '9px system-ui';
+  ctx.textAlign   = 'center';
+  ctx.fillText('Position (bp)', w / 2, h - 1);
+
+  // ── Trace legend top-right ────────────────────────────────────
+  ctx.font      = 'bold 10px monospace';
+  ctx.textAlign = 'left';
+  CHROMA_BASES.forEach((b, i) => {
+    const lx = w - 88 + i * 22;
+    ctx.fillStyle = STAINS.natural[b];
+    ctx.fillText(b, lx, 14);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  Animation loop
 // ═══════════════════════════════════════════════════════════════════
 const helixCanvas  = document.getElementById('helix-canvas');
 const strandCanvas = document.getElementById('strand-canvas');
 const gelCanvas    = document.getElementById('gel-canvas');
+const chromaCanvas = document.getElementById('chroma-canvas');
 
-let lastTime = null;
+let chromaOff = 0;   // chromatogram scroll offset in px
+let lastTime  = null;
 
 function loop(ts) {
   if (lastTime === null) lastTime = ts;
   const dt = (ts - lastTime) / 1000;
   lastTime = ts;
 
+  const maxStrand = Math.max(1, snpData.length * zoom);
+  const maxChroma = Math.max(1, snpData.length * 28);
+
   angle     = (angle + dt * speed * 0.6) % (Math.PI * 2);
-  strandOff = (strandOff + dt * speed * zoom * 4) % Math.max(1, snpData.length * zoom);
+  strandOff = (strandOff + dt * speed * zoom * 4) % maxStrand;
+  chromaOff = (chromaOff + dt * speed * 22)       % maxChroma;
 
   drawHelix(helixCanvas, snpData, angle);
 
-  if (activeTab === 'strand') {
-    drawStrands(strandCanvas, snpData, strandOff, zoom);
-  } else {
-    drawGel(gelCanvas, snpData);
-  }
+  if      (activeTab === 'strand')      drawStrands(strandCanvas, snpData, strandOff, zoom);
+  else if (activeTab === 'gel')         drawGel(gelCanvas, snpData);
+  else if (activeTab === 'chromatogram') drawChromatogram(chromaCanvas, snpData, chromaOff);
 
   raf = requestAnimationFrame(loop);
 }
