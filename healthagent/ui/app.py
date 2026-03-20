@@ -66,6 +66,47 @@ _last_use_time: float = 0.0         # epoch seconds of last API call
 _db_update_task: Optional[asyncio.Task] = None
 _db_initialized: bool = False
 
+# ── Download progress tracker ─────────────────────────────────────
+# Maps source name → {"pct": int, "msg": str, "done": bool}
+_DOWNLOAD_TASKS = [
+    "wellness", "ensembl", "gwas", "clinvar", "pharmgkb",
+    "disgenet", "opentargets", "finngen",
+]
+_dl_progress: dict = {
+    "active":       False,
+    "overall_pct":  0,
+    "tasks":        {t: {"pct": 0, "msg": "", "done": False} for t in _DOWNLOAD_TASKS},
+    "current_task": "",
+    "started_at":   None,
+}
+
+
+def _make_progress_cb(source: str):
+    """Return a progress_cb that updates _dl_progress for the given source."""
+    import re
+    def cb(msg: str):
+        log.info(msg)
+        _dl_progress["tasks"][source]["msg"] = msg
+        _dl_progress["current_task"] = source
+        # Parse percentage from "[Label] Downloaded X/Y MB (N%)" messages
+        m = re.search(r'\((\d+)%\)', msg)
+        if m:
+            _dl_progress["tasks"][source]["pct"] = int(m.group(1))
+        elif "Done" in msg or "done" in msg or "complete" in msg.lower() or "stored" in msg.lower():
+            _dl_progress["tasks"][source]["pct"] = 100
+        _update_overall_pct()
+    return cb
+
+
+def _update_overall_pct():
+    tasks = _dl_progress["tasks"]
+    done_count = sum(1 for t in tasks.values() if t["done"])
+    active_pct  = sum(t["pct"] for t in tasks.values() if not t["done"])
+    # Each task is worth 1/N of total; add partial credit for in-progress task
+    n = len(tasks)
+    overall = int((done_count * 100 + active_pct) / n)
+    _dl_progress["overall_pct"] = min(overall, 99 if _dl_progress["active"] else 100)
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  Startup — init DB and seed wellness traits
@@ -136,15 +177,39 @@ def _run_full_update():
       7. OpenTargets           — GraphQL per-gene queries (rate-limited)
       8. FinnGen               — biobank phenome per-SNP queries (rate-limited)
     """
+    import time as _time
+    _dl_progress["active"] = True
+    _dl_progress["overall_pct"] = 0
+    _dl_progress["started_at"] = _time.time()
+    for t in _dl_progress["tasks"].values():
+        t["pct"] = 0
+        t["msg"] = ""
+        t["done"] = False
+
+    def _step(source, fn, **kw):
+        _dl_progress["current_task"] = source
+        cb = _make_progress_cb(source)
+        try:
+            fn(progress_cb=cb, **kw)
+        except Exception as e:
+            log.error(f"[DB] {source} failed: {e}")
+        _dl_progress["tasks"][source]["done"] = True
+        _dl_progress["tasks"][source]["pct"] = 100
+        _update_overall_pct()
+
     local_db.init_db()
-    seed_wellness_traits(progress_cb=log.info)
-    download_ensembl_consequences(progress_cb=log.info)
-    download_gwas(progress_cb=log.info)
-    download_clinvar(progress_cb=log.info)
-    download_pharmgkb(progress_cb=log.info)
-    download_disgenet(progress_cb=log.info)
-    download_opentargets(progress_cb=log.info)
-    download_finngen(progress_cb=log.info)
+    _step("wellness",    seed_wellness_traits)
+    _step("ensembl",     download_ensembl_consequences)
+    _step("gwas",        download_gwas)
+    _step("clinvar",     download_clinvar)
+    _step("pharmgkb",   download_pharmgkb)
+    _step("disgenet",    download_disgenet)
+    _step("opentargets", download_opentargets)
+    _step("finngen",     download_finngen)
+
+    _dl_progress["active"] = False
+    _dl_progress["overall_pct"] = 100
+    _dl_progress["current_task"] = ""
     log.info("[DB] Scheduled database refresh complete.")
 
 
@@ -559,6 +624,30 @@ async def trigger_db_update(background_tasks: BackgroundTasks):
     _touch_last_use()
     background_tasks.add_task(_run_full_update)
     return {"status": "started", "message": "Database update started in background."}
+
+
+@app.get("/api/db/progress")
+async def db_progress():
+    """Return real-time download progress for all database sources."""
+    _touch_last_use()
+    import time as _time
+    elapsed = None
+    if _dl_progress["started_at"]:
+        elapsed = round(_time.time() - _dl_progress["started_at"])
+    return {
+        "active":       _dl_progress["active"],
+        "overall_pct":  _dl_progress["overall_pct"],
+        "current_task": _dl_progress["current_task"],
+        "elapsed_s":    elapsed,
+        "tasks": {
+            name: {
+                "pct":  info["pct"],
+                "done": info["done"],
+                "msg":  info["msg"][-120:] if info["msg"] else "",
+            }
+            for name, info in _dl_progress["tasks"].items()
+        },
+    }
 
 
 @app.get("/api/tcga")
