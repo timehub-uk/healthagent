@@ -240,7 +240,9 @@ async def _maybe_trigger_update(background_tasks: BackgroundTasks):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     _touch_last_use()
-    return templates.TemplateResponse("index.html", {"request": request})
+    response = templates.TemplateResponse("index.html", {"request": request})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 import re as _re_module
