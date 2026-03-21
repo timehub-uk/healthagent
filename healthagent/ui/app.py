@@ -163,6 +163,35 @@ async def _db_update_loop(check_immediately: bool = False):
             await asyncio.get_event_loop().run_in_executor(None, _run_full_update)
             return
 
+        # If any new tables are completely empty, run a targeted fill even if
+        # the DB was last updated recently (handles upgrades to this version).
+        new_table_sources = [
+            ("clingen_validity",   "clingen",  download_clingen),
+            ("gnomad_frequency",   "gnomad",   download_gnomad),
+            ("gtex_eqtl",          "gtex",     download_gtex),
+            ("reactome_pathway",   "reactome", download_reactome),
+            ("uniprot_annotation", "uniprot",  download_uniprot),
+        ]
+        empty_tables = []
+        for table, source, fn in new_table_sources:
+            try:
+                cnt = local_db.query(f"SELECT COUNT(*) AS n FROM {table}")
+                if (cnt[0]["n"] if cnt else 0) == 0:
+                    empty_tables.append((source, fn))
+            except Exception:
+                empty_tables.append((source, fn))
+
+        if empty_tables:
+            log.info(f"[DB] New empty tables detected ({[s for s,_ in empty_tables]}) — populating...")
+            def _fill_new():
+                from concurrent.futures import ThreadPoolExecutor as _TPE
+                with _TPE(max_workers=3, thread_name_prefix="ha-new") as pool:
+                    futures = [pool.submit(_run_one, src, fn) for src, fn in empty_tables]
+                    for fut in futures:
+                        try: fut.result()
+                        except Exception as e: log.error(f"[DB] new-table fill error: {e}")
+            await asyncio.get_event_loop().run_in_executor(None, _fill_new)
+
         last_dt = datetime.datetime.fromisoformat(last_update_str)
         age_h   = (datetime.datetime.utcnow() - last_dt).total_seconds() / 3600
 
@@ -184,6 +213,20 @@ async def _db_update_loop(check_immediately: bool = False):
     while True:
         await asyncio.sleep(3600)   # re-check every hour
         await _check_and_update()
+
+
+def _run_one(source: str, fn, **kw) -> None:
+    """Run a single download function with progress tracking. Module-level helper."""
+    _dl_progress["tasks"].setdefault(source, {"pct": 0, "msg": "", "done": False})
+    _dl_progress["current_task"] = source
+    cb = _make_progress_cb(source)
+    try:
+        fn(progress_cb=cb, **kw)
+    except Exception as e:
+        log.error(f"[DB] {source} failed: {e}")
+    _dl_progress["tasks"][source]["done"] = True
+    _dl_progress["tasks"][source]["pct"] = 100
+    _update_overall_pct()
 
 
 def _run_full_update():
@@ -212,16 +255,7 @@ def _run_full_update():
         t["msg"] = ""
         t["done"] = False
 
-    def _step(source, fn, **kw):
-        _dl_progress["current_task"] = source
-        cb = _make_progress_cb(source)
-        try:
-            fn(progress_cb=cb, **kw)
-        except Exception as e:
-            log.error(f"[DB] {source} failed: {e}")
-        _dl_progress["tasks"][source]["done"] = True
-        _dl_progress["tasks"][source]["pct"] = 100
-        _update_overall_pct()
+    _step = _run_one  # reuse module-level helper
 
     local_db.init_db()
 
