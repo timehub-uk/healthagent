@@ -28,7 +28,7 @@ from healthagent.databases.downloader import (
     download_finngen,
     download_opentargets,
 )
-from healthagent.health_traits import analyze_profile
+from healthagent.health_traits import analyze_profile, invalidate_cache as _invalidate_analysis_cache
 from healthagent.databases.tcga_client import query_tcga_for_rsids, get_cached_tcga
 from healthagent.microbiome_importer import (
     import_pathabundance,
@@ -128,56 +128,76 @@ async def startup():
     else:
         log.info("HealthAgent DB initialised. No saved profile found.")
 
-    # Schedule the 24-hour background update loop
-    asyncio.create_task(_db_update_loop())
+    # Schedule the 24-hour background update loop (checks immediately on startup)
+    asyncio.create_task(_db_update_loop(check_immediately=True))
 
 
-async def _db_update_loop():
-    """Background task: refresh open-source databases every 24 hours,
-    but only when the site is being actively used (last API call < 1 hour ago).
-    If site is idle, defer until next use triggers a check."""
-    while True:
-        await asyncio.sleep(3600)   # check every hour
+async def _db_update_loop(check_immediately: bool = False):
+    """Background task: refresh open-source databases every 24 hours.
+
+    Checks on startup (check_immediately=True) and then every hour.
+    Skips update if site is idle (no API call in last hour) UNLESS
+    the databases have never been populated.
+    """
+    import datetime
+
+    async def _check_and_update():
         now = time.time()
         idle_hours = (now - _last_use_time) / 3600
 
-        if idle_hours > 1.0:
-            log.info("[DB] Site idle — deferring database update.")
-            continue
-
-        # Check when DB was last updated
         rows = local_db.query(
             """SELECT MAX(finished_at) AS last_update FROM download_log
-               WHERE status = 'completed'"""
+               WHERE source != 'wellness' AND status = 'completed'"""
         )
         last_update_str = rows[0]["last_update"] if rows else None
+        never_updated = last_update_str is None
 
-        if last_update_str:
-            import datetime
-            last_dt = datetime.datetime.fromisoformat(last_update_str)
-            age_h = (datetime.datetime.utcnow() - last_dt).total_seconds() / 3600
-            if age_h < _DB_UPDATE_INTERVAL_H:
-                log.info(f"[DB] Last update {age_h:.1f}h ago — no refresh needed.")
-                continue
+        if never_updated:
+            log.info("[DB] Databases never populated — running initial download now...")
+            await asyncio.get_event_loop().run_in_executor(None, _run_full_update)
+            return
 
-        log.info("[DB] Starting scheduled 24-hour database refresh...")
+        last_dt = datetime.datetime.fromisoformat(last_update_str)
+        age_h   = (datetime.datetime.utcnow() - last_dt).total_seconds() / 3600
+
+        if idle_hours > 1.0 and age_h < _DB_UPDATE_INTERVAL_H:
+            log.info(f"[DB] Site idle ({idle_hours:.1f}h) — deferring update (last: {age_h:.1f}h ago).")
+            return
+
+        if age_h < _DB_UPDATE_INTERVAL_H:
+            log.info(f"[DB] Last update {age_h:.1f}h ago — no refresh needed.")
+            return
+
+        log.info(f"[DB] Starting background database refresh (last: {age_h:.1f}h ago)...")
         await asyncio.get_event_loop().run_in_executor(None, _run_full_update)
+
+    if check_immediately:
+        await asyncio.sleep(5)   # let the server fully start first
+        await _check_and_update()
+
+    while True:
+        await asyncio.sleep(3600)   # re-check every hour
+        await _check_and_update()
 
 
 def _run_full_update():
-    """Run all database downloads synchronously (called from executor).
+    """Run all database downloads, parallelising where safe.
 
-    Order is deliberate:
-      1. Wellness traits seed  — fast, always safe, curated data
-      2. Ensembl VEP           — annotates our tracked SNPs first (small, fast)
-      3. GWAS Catalog          — large bulk download
-      4. ClinVar               — large bulk download
-      5. PharmGKB              — medium, drug interactions
-      6. DisGeNET              — gene-disease scored associations
-      7. OpenTargets           — GraphQL per-gene queries (rate-limited)
-      8. FinnGen               — biobank phenome per-SNP queries (rate-limited)
+    Sequential (order-dependent or curated):
+      1. Wellness traits seed  — curated, must run first
+      2. Ensembl VEP           — annotates tracked SNPs (small, fast)
+
+    Parallel batch (all independent bulk downloads):
+      3a. GWAS Catalog         — large bulk download
+      3b. ClinVar              — large bulk download
+      3c. PharmGKB             — medium, drug interactions
+      3d. DisGeNET             — gene-disease associations
+      3e. OpenTargets          — GraphQL per-gene queries
+      3f. FinnGen              — biobank phenome queries
     """
     import time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+
     _dl_progress["active"] = True
     _dl_progress["overall_pct"] = 0
     _dl_progress["started_at"] = _time.time()
@@ -198,19 +218,32 @@ def _run_full_update():
         _update_overall_pct()
 
     local_db.init_db()
-    _step("wellness",    seed_wellness_traits)
-    _step("ensembl",     download_ensembl_consequences)
-    _step("gwas",        download_gwas)
-    _step("clinvar",     download_clinvar)
-    _step("pharmgkb",   download_pharmgkb)
-    _step("disgenet",    download_disgenet)
-    _step("opentargets", download_opentargets)
-    _step("finngen",     download_finngen)
+
+    # Phase 1 — sequential (order matters)
+    _step("wellness", seed_wellness_traits)
+    _step("ensembl",  download_ensembl_consequences)
+
+    # Phase 2 — parallel bulk downloads
+    parallel_tasks = [
+        ("gwas",        download_gwas),
+        ("clinvar",     download_clinvar),
+        ("pharmgkb",    download_pharmgkb),
+        ("disgenet",    download_disgenet),
+        ("opentargets", download_opentargets),
+        ("finngen",     download_finngen),
+    ]
+    with _TPE(max_workers=4, thread_name_prefix="ha-dl") as pool:
+        futures = {pool.submit(_step, src, fn): src for src, fn in parallel_tasks}
+        for fut in futures:
+            try:
+                fut.result()
+            except Exception as e:
+                log.error(f"[DB] parallel download error: {e}")
 
     _dl_progress["active"] = False
     _dl_progress["overall_pct"] = 100
     _dl_progress["current_task"] = ""
-    log.info("[DB] Scheduled database refresh complete.")
+    log.info("[DB] Background database refresh complete.")
 
 
 def _touch_last_use():
@@ -245,7 +278,9 @@ async def index(request: Request):
     return response
 
 
+import hashlib as _hashlib
 import re as _re_module
+import zlib as _zlib
 
 # ── Upload security constants ─────────────────────────────────────
 _MAX_UPLOAD_BYTES   = 500 * 1024 * 1024   # 500 MB hard cap per upload
@@ -254,6 +289,18 @@ _MAX_TOTAL_CHUNKS   = 200                 # cap at 800 MB raw
 _MIN_DNA_SNPS       = 10                  # reject if fewer than 10 SNPs parsed (not a DNA file)
 _UPLOAD_ID_RE       = _re_module.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 _SAFE_FILENAME_RE   = _re_module.compile(r'^[\w\-. ]+$')   # no path separators or special chars
+
+
+def _genome_uid(raw_bytes: bytes) -> str:
+    """Generate a deterministic 16-hex-digit Genome UID from file content.
+
+    Combines CRC-32 (fast checksum) with the first 8 bytes of SHA-256
+    to produce a stable, collision-resistant `DNA-xxxxxxxxxxxxxxxx` reference.
+    """
+    crc  = _zlib.crc32(raw_bytes) & 0xFFFFFFFF
+    sha  = int.from_bytes(_hashlib.sha256(raw_bytes).digest()[:8], "big")
+    uid  = (crc ^ sha) & 0xFFFFFFFFFFFFFFFF   # 64-bit XOR mix
+    return f"DNA-{uid:016X}"
 
 
 def _sanitise_filename(name: str) -> str:
@@ -302,14 +349,18 @@ async def upload_dna(
                    "Please upload a 23andMe, AncestryDNA, MyHeritage, FTDNA, or VCF file.",
         )
 
+    genome_uid = _genome_uid(raw_bytes)
     _profile = profile
+    _profile.metadata["genome_uid"] = genome_uid
+    _invalidate_analysis_cache()
     background_tasks.add_task(save_profile, _profile)
     await _maybe_trigger_update(background_tasks)
 
     return {
-        "format":    _profile.source_format.value,
-        "snp_count": _profile.snp_count,
-        "filename":  safe_name,
+        "format":     _profile.source_format.value,
+        "snp_count":  _profile.snp_count,
+        "filename":   safe_name,
+        "genome_uid": genome_uid,
     }
 
 
@@ -403,7 +454,8 @@ async def commit_upload(
     import shutil
     shutil.rmtree(chunk_dir, ignore_errors=True)
 
-    raw = b"".join(parts).decode("utf-8", errors="replace")
+    raw_bytes_assembled = b"".join(parts)
+    raw = raw_bytes_assembled.decode("utf-8", errors="replace")
 
     try:
         profile = import_dna_string(raw, filename=safe_name)
@@ -417,14 +469,18 @@ async def commit_upload(
                    "Please upload a 23andMe, AncestryDNA, MyHeritage, FTDNA, or VCF file.",
         )
 
+    genome_uid = _genome_uid(raw_bytes_assembled)
     _profile = profile
+    _profile.metadata["genome_uid"] = genome_uid
+    _invalidate_analysis_cache()
     background_tasks.add_task(save_profile, _profile)
     await _maybe_trigger_update(background_tasks)
 
     return {
-        "format":    _profile.source_format.value,
-        "snp_count": _profile.snp_count,
-        "filename":  safe_name,
+        "format":     _profile.source_format.value,
+        "snp_count":  _profile.snp_count,
+        "filename":   safe_name,
+        "genome_uid": genome_uid,
     }
 
 
@@ -522,6 +578,20 @@ async def get_snps(
     }
 
 
+@app.delete("/api/clear")
+async def clear_profile():
+    """Delete the stored profile and clear all caches. Called by the 'Clear Data' button."""
+    global _profile
+    _profile = None
+    _invalidate_analysis_cache()
+    from healthagent.databases.local_db import delete_profile
+    try:
+        delete_profile()
+    except Exception:
+        pass  # function may not exist yet — harmless
+    return {"cleared": True}
+
+
 @app.get("/api/profile")
 async def get_profile():
     """Return metadata about the currently loaded DNA profile."""
@@ -560,6 +630,7 @@ async def get_profile():
         "no_call":         no_call,
         "restored":        _profile.metadata.get("restored", False),
         "saved_at":        saved_at,
+        "genome_uid":      _profile.metadata.get("genome_uid"),
         "metadata":        {k: v for k, v in _profile.metadata.items() if k != "restored"},
     }
 

@@ -353,12 +353,13 @@ def save_profile(profile: "DNAProfile") -> int:
         rows,
     )
 
-    # Store format and filename for reload
+    # Store format, genome_uid, and SNP count for reload / returning-user detection
+    genome_uid = profile.metadata.get("genome_uid", "") if hasattr(profile, "metadata") and profile.metadata else ""
     conn.execute("DELETE FROM download_log WHERE source = 'profile_meta'")
     conn.commit()
     execute(
-        "INSERT INTO download_log(source, status, records_added) VALUES (?,?,?)",
-        ("profile_meta", profile.source_format.value, len(rows)),
+        "INSERT INTO download_log(source, status, records_added, error_msg) VALUES (?,?,?,?)",
+        ("profile_meta", profile.source_format.value, len(rows), genome_uid or None),
     )
     return len(rows)
 
@@ -371,13 +372,14 @@ def load_profile() -> "Optional[DNAProfile]":
     from healthagent.dna_importer import DNAProfile, SNP, DNAFormat
 
     meta = query(
-        "SELECT status, records_added FROM download_log WHERE source='profile_meta' ORDER BY id DESC LIMIT 1"
+        "SELECT status, records_added, error_msg FROM download_log WHERE source='profile_meta' ORDER BY id DESC LIMIT 1"
     )
     if not meta:
         return None
 
-    fmt_val  = meta[0]["status"]
-    expected = meta[0]["records_added"]
+    fmt_val    = meta[0]["status"]
+    expected   = meta[0]["records_added"]
+    genome_uid = meta[0]["error_msg"]  # stored in error_msg column for backwards-compat
 
     rows = query("SELECT rsid, chromosome, position, alleles FROM snp")
     if not rows:
@@ -398,7 +400,19 @@ def load_profile() -> "Optional[DNAProfile]":
         for r in rows
     ]
 
-    return DNAProfile(source_format=fmt, snps=snps, metadata={"restored": True, "snp_count": expected})
+    metadata: dict = {"restored": True, "snp_count": expected}
+    if genome_uid and genome_uid.startswith("DNA-"):
+        metadata["genome_uid"] = genome_uid
+
+    return DNAProfile(source_format=fmt, snps=snps, metadata=metadata)
+
+
+def delete_profile() -> None:
+    """Erase all stored SNP data and profile metadata (Clear Data action)."""
+    conn = _get_conn()
+    conn.execute("DELETE FROM snp")
+    conn.execute("DELETE FROM download_log WHERE source='profile_meta'")
+    conn.commit()
 
 
 def log_download(source: str, status: str, records: int = 0, error: str = None) -> int:

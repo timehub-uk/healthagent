@@ -5,14 +5,20 @@ Combines data from:
   - gwas_association (open GWAS Catalog data)
   - clinvar_variant  (clinical significance)
   - drug_interaction (PharmGKB pharmacogenomics)
+
+All independent DB queries run in parallel via ThreadPoolExecutor.
+Results are cached by profile hash to avoid redundant re-analysis.
 """
 
 from __future__ import annotations
 
+import hashlib
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from healthagent.databases import local_db
-from healthagent.databases.tcga_client import get_cached_tcga, query_tcga_for_rsids
+from healthagent.databases.tcga_client import get_cached_tcga
 
 if TYPE_CHECKING:
     from healthagent.dna_importer import DNAProfile
@@ -36,6 +42,22 @@ RISK_META = {
     "elevated": {"label": "Worth Noting", "color": "#f43f5e", "bg": "#fee2e2"},
 }
 
+# ── Profile analysis cache ─────────────────────────────────────────
+_analysis_cache: dict = {}
+_cache_lock = threading.Lock()
+
+
+def _profile_hash(rsid_list: list[str]) -> str:
+    """Deterministic hash of the rsid list for cache keying."""
+    key = "|".join(sorted(rsid_list))
+    return hashlib.md5(key.encode()).hexdigest()
+
+
+def invalidate_cache() -> None:
+    """Clear the analysis cache (call after a fresh DNA upload)."""
+    with _cache_lock:
+        _analysis_cache.clear()
+
 
 def analyze_profile(profile: "DNAProfile") -> dict:
     """
@@ -47,18 +69,67 @@ def analyze_profile(profile: "DNAProfile") -> dict:
       - clinvar:    list of ClinVar clinical findings
       - drugs:      list of medication interaction findings
       - summary:    high-level counts and category breakdown
+
+    All independent DB queries execute in parallel threads.
+    Results are cached by profile hash; call invalidate_cache() after upload.
     """
     local_db.init_db()
 
-    # Build lookup maps from profile
-    rsid_list  = [s.rsid for s in profile.snps]
-    geno_map   = {s.rsid: s.genotype.upper() for s in profile.snps}
-    gene_set   = {s.rsid: None for s in profile.snps}  # genes filled from DB
+    rsid_list = [s.rsid for s in profile.snps]
+    geno_map  = {s.rsid: s.genotype.upper() for s in profile.snps}
 
-    # ── Wellness traits ───────────────────────────────────────────
-    wellness_rows = local_db.get_wellness_traits(rsid_list, geno_map)
+    # ── Cache check ───────────────────────────────────────────────
+    cache_key = _profile_hash(rsid_list)
+    with _cache_lock:
+        if cache_key in _analysis_cache:
+            return _analysis_cache[cache_key]
 
-    # Enrich with category and risk metadata
+    # ── Phase 1: all rsid-independent queries run in parallel ─────
+    with ThreadPoolExecutor(max_workers=8, thread_name_prefix="ha-db") as pool:
+        f_wellness  = pool.submit(local_db.get_wellness_traits, rsid_list, geno_map)
+        f_gwas      = pool.submit(local_db.get_gwas_associations, rsid_list, 3)
+        f_clinvar   = pool.submit(local_db.get_clinvar_variants, rsid_list)
+        f_ensembl   = pool.submit(local_db.get_ensembl_consequences, rsid_list)
+        f_biobank   = pool.submit(local_db.get_biobank_phenotypes, rsid_list)
+        f_tcga      = pool.submit(get_cached_tcga, rsid_list)
+        f_wt_genes  = pool.submit(
+            local_db.query,
+            "SELECT DISTINCT gene FROM wellness_trait WHERE gene IS NOT NULL AND gene != ''"
+        )
+        f_snp_genes = (
+            pool.submit(local_db.query,
+                        "SELECT DISTINCT gene FROM snp WHERE gene IS NOT NULL AND gene != ''")
+            if rsid_list else None
+        )
+
+        wellness_rows = f_wellness.result()
+        gwas_rows     = f_gwas.result()
+        clinvar_rows  = f_clinvar.result()
+        ensembl_rows  = f_ensembl.result()
+        biobank_rows  = f_biobank.result()
+        tcga          = f_tcga.result()
+        wt_gene_rows  = f_wt_genes.result()
+        snp_gene_rows = f_snp_genes.result() if f_snp_genes else []
+
+    # Build gene set from phase-1 results
+    genes: list[str] = list(
+        {r["gene"] for r in wt_gene_rows}
+        | {r["gene"] for r in snp_gene_rows if r["gene"]}
+    )
+
+    # ── Phase 2: gene-dependent queries run in parallel ───────────
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="ha-gene") as pool:
+        f_drugs       = pool.submit(
+            lambda: local_db.get_drug_interactions(rsids=rsid_list, genes=genes)
+        )
+        f_disgenet    = pool.submit(local_db.get_disgenet_diseases, genes, 0.3)
+        f_opentargets = pool.submit(local_db.get_opentargets, genes)
+
+        drug_rows        = f_drugs.result()
+        disgenet_rows    = f_disgenet.result()
+        opentargets_rows = f_opentargets.result()
+
+    # ── Enrich wellness results ───────────────────────────────────
     wellness = []
     for row in wellness_rows:
         cat  = CATEGORY_META.get(row["category"], {})
@@ -72,65 +143,47 @@ def analyze_profile(profile: "DNAProfile") -> dict:
             "risk_bg":        risk["bg"],
         })
 
-    # ── GWAS associations ─────────────────────────────────────────
-    gwas_rows = local_db.get_gwas_associations(rsid_list, limit=3)
+    # ── Enrich GWAS results ───────────────────────────────────────
     gwas = []
     for row in gwas_rows:
         trait_name = row.get("trait") or row.get("trait_name") or ""
         if not trait_name:
-            continue  # skip unknown/empty GWAS records
+            continue
         gwas.append({
             **row,
-            "trait_name":   trait_name.title(),
-            "category":     "gwas",
-            "detail":       row.get("study_title") or "",
-            "your_result":  _gwas_plain_result(row.get("odds_ratio"), row.get("risk_allele")),
-            "p_value_fmt":  _fmt_pval(row.get("p_value")),
-            "or_fmt":       _fmt_or(row.get("odds_ratio")),
+            "trait_name":  trait_name.title(),
+            "category":    "gwas",
+            "detail":      row.get("study_title") or "",
+            "your_result": _gwas_plain_result(row.get("odds_ratio"), row.get("risk_allele")),
+            "p_value_fmt": _fmt_pval(row.get("p_value")),
+            "or_fmt":      _fmt_or(row.get("odds_ratio")),
         })
 
-    # ── ClinVar ───────────────────────────────────────────────────
-    clinvar_rows = local_db.get_clinvar_variants(rsid_list)
+    # ── Enrich ClinVar results ────────────────────────────────────
     clinvar = []
     for row in clinvar_rows:
-        sig = row.get("clinical_sig", "")
+        sig       = row.get("clinical_sig", "")
         condition = row.get("condition") or ""
-        gene = row.get("gene") or ""
+        gene      = row.get("gene") or ""
         trait_name = condition.split(";")[0].strip() if condition else (gene or "")
         if not trait_name:
-            continue  # skip empty ClinVar records
+            continue
         clinvar.append({
             **row,
-            "trait_name":        trait_name,
-            "category":          "clinvar",
-            "your_result":       _clinvar_plain(sig),
-            "detail":            condition,
+            "trait_name":         trait_name,
+            "category":           "clinvar",
+            "your_result":        _clinvar_plain(sig),
+            "detail":             condition,
             "plain_significance": _clinvar_plain(sig),
-            "severity_color":    _clinvar_color(sig),
+            "severity_color":     _clinvar_color(sig),
         })
 
-    # ── Gather gene names from all sources ────────────────────────
-    genes: list[str] = []
-    # From wellness_trait table (always populated)
-    wt_genes = local_db.query(
-        "SELECT DISTINCT gene FROM wellness_trait WHERE gene IS NOT NULL AND gene != ''"
-    )
-    genes = list({r["gene"] for r in wt_genes})
-    # Also from snp table if populated (snp table is small — only tracked rsids)
-    if rsid_list:
-        snp_genes = local_db.query(
-            "SELECT DISTINCT gene FROM snp WHERE gene IS NOT NULL AND gene != ''"
-        )
-        genes = list(set(genes) | {r["gene"] for r in snp_genes if r["gene"]})
-
-    # ── Drug interactions ─────────────────────────────────────────
-    drug_rows = local_db.get_drug_interactions(rsids=rsid_list, genes=genes)
+    # ── Enrich drug interaction results ───────────────────────────
     drugs = []
     for row in drug_rows:
         drug_name = row.get("drug_name") or ""
         if not drug_name:
             continue
-        gene = row.get("gene") or ""
         phenotype = row.get("phenotype") or ""
         drugs.append({
             **row,
@@ -138,19 +191,13 @@ def analyze_profile(profile: "DNAProfile") -> dict:
             "category":    "medications",
             "your_result": _drug_plain_result(phenotype, row.get("category")),
             "detail":      row.get("plain_english") or phenotype,
-            "what_to_do":  f"Speak to your doctor or pharmacist before taking {drug_name}. Your genetic profile may affect how this medication works for you.",
+            "what_to_do":  (
+                f"Speak to your doctor or pharmacist before taking {drug_name}. "
+                "Your genetic profile may affect how this medication works for you."
+            ),
         })
 
-    # ── DisGeNET gene-disease associations ────────────────────────
-    disgenet_rows = local_db.get_disgenet_diseases(genes, min_score=0.3)
-    disgenet = [dict(r) for r in disgenet_rows]
-
-    # ── OpenTargets gene-disease scores ──────────────────────────
-    opentargets_rows = local_db.get_opentargets(genes)
-    opentargets = [dict(r) for r in opentargets_rows]
-
-    # ── Ensembl VEP consequences ──────────────────────────────────
-    ensembl_rows = local_db.get_ensembl_consequences(rsid_list)
+    # ── Enrich Ensembl results ────────────────────────────────────
     ensembl = []
     for row in ensembl_rows:
         ensembl.append({
@@ -159,13 +206,6 @@ def analyze_profile(profile: "DNAProfile") -> dict:
             "impact_color":      _impact_color(row.get("impact", "")),
         })
 
-    # ── Biobank phenotypes (FinnGen etc.) ─────────────────────────
-    biobank_rows = local_db.get_biobank_phenotypes(rsid_list)
-    biobank = [dict(r) for r in biobank_rows]
-
-    # ── TCGA cancer mutation context (cached, per-user SNPs only) ─
-    tcga = get_cached_tcga(rsid_list)
-
     # ── Summary ───────────────────────────────────────────────────
     cat_counts: dict[str, int] = {}
     for w in wellness:
@@ -173,33 +213,37 @@ def analyze_profile(profile: "DNAProfile") -> dict:
 
     worth_noting = sum(1 for w in wellness if w.get("risk_level") == "elevated")
 
-    summary = {
-        "total_snps":        len(rsid_list),
-        "traits_found":      len(wellness),
-        "gwas_found":        len(gwas),
-        "clinvar_found":     len(clinvar),
-        "drugs_found":       len(drugs),
-        "tcga_found":        len(tcga),
-        "worth_noting":      worth_noting,
-        "category_counts":   cat_counts,
-        "db_stats":          local_db.get_db_stats(),
-    }
-
-    return {
+    result = {
         "wellness":    wellness,
         "gwas":        gwas,
         "clinvar":     clinvar,
         "drugs":       drugs,
-        "disgenet":    disgenet,
-        "opentargets": opentargets,
+        "disgenet":    [dict(r) for r in disgenet_rows],
+        "opentargets": [dict(r) for r in opentargets_rows],
         "ensembl":     ensembl,
-        "biobank":     biobank,
+        "biobank":     [dict(r) for r in biobank_rows],
         "tcga":        tcga,
-        "summary":     summary,
+        "summary": {
+            "total_snps":      len(rsid_list),
+            "traits_found":    len(wellness),
+            "gwas_found":      len(gwas),
+            "clinvar_found":   len(clinvar),
+            "drugs_found":     len(drugs),
+            "tcga_found":      len(tcga),
+            "worth_noting":    worth_noting,
+            "category_counts": cat_counts,
+            "db_stats":        local_db.get_db_stats(),
+        },
     }
 
+    # Store in cache
+    with _cache_lock:
+        _analysis_cache[cache_key] = result
 
-# ── Formatting helpers ────────────────────────────────────────────
+    return result
+
+
+# ── Formatting helpers ─────────────────────────────────────────────
 
 def _fmt_pval(p) -> str:
     if p is None:
@@ -281,19 +325,38 @@ def _gwas_plain_result(odds_ratio, risk_allele) -> str:
     except (TypeError, ValueError):
         return "A DNA variant near this gene has been linked to this trait in research studies."
 
-    allele_note = f" (variant: {risk_allele})" if risk_allele and risk_allele not in ("—", "", "?") else ""
+    allele_note = (
+        f" (variant: {risk_allele})"
+        if risk_allele and risk_allele not in ("—", "", "?")
+        else ""
+    )
     if or_val >= 2.0:
-        return f"Your DNA variant{allele_note} is associated with roughly {or_val:.1f}× higher likelihood of this trait in research studies."
+        return (
+            f"Your DNA variant{allele_note} is associated with roughly {or_val:.1f}× higher "
+            "likelihood of this trait in research studies."
+        )
     elif or_val >= 1.2:
         pct = int((or_val - 1) * 100)
-        return f"Research links your DNA variant{allele_note} to about {pct}% higher likelihood of this trait compared to average."
+        return (
+            f"Research links your DNA variant{allele_note} to about {pct}% higher likelihood "
+            "of this trait compared to average."
+        )
     elif or_val >= 0.95:
-        return f"Your DNA variant{allele_note} shows little difference from average for this trait in research studies."
+        return (
+            f"Your DNA variant{allele_note} shows little difference from average "
+            "for this trait in research studies."
+        )
     elif or_val >= 0.5:
         pct = int((1 - or_val) * 100)
-        return f"Your DNA variant{allele_note} is associated with roughly {pct}% lower likelihood of this trait compared to average."
+        return (
+            f"Your DNA variant{allele_note} is associated with roughly {pct}% lower likelihood "
+            "of this trait compared to average."
+        )
     else:
-        return f"Your DNA variant{allele_note} is strongly associated with reduced likelihood of this trait in research studies."
+        return (
+            f"Your DNA variant{allele_note} is strongly associated with reduced likelihood "
+            "of this trait in research studies."
+        )
 
 
 def _drug_plain_result(phenotype: str, category: str) -> str:
@@ -302,13 +365,13 @@ def _drug_plain_result(phenotype: str, category: str) -> str:
         return "Your DNA may affect how your body responds to this medication."
     ph = phenotype.lower()
     if "poor" in ph or "slow" in ph or "decreased" in ph or "reduced" in ph:
-        return f"Your body may process this medication more slowly than average — it can build up to higher levels."
+        return "Your body may process this medication more slowly than average — it can build up to higher levels."
     if "rapid" in ph or "ultra" in ph or "fast" in ph or "increased" in ph:
-        return f"Your body may break down this medication faster than average — it may wear off sooner."
+        return "Your body may break down this medication faster than average — it may wear off sooner."
     if "intermediate" in ph:
-        return f"Your body processes this medication at a slightly below-average rate."
+        return "Your body processes this medication at a slightly below-average rate."
     if "toxicity" in ph or "adverse" in ph or "risk" in ph:
-        return f"Your DNA variant is linked to a higher risk of side effects with this medication."
+        return "Your DNA variant is linked to a higher risk of side effects with this medication."
     if "efficacy" in ph or "response" in ph or "effective" in ph:
-        return f"This medication may work differently for you based on your genetic profile."
+        return "This medication may work differently for you based on your genetic profile."
     return phenotype

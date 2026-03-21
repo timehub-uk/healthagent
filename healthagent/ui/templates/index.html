@@ -12,28 +12,29 @@
 /* ── Reset & base ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg:        #0d1117;
-  --card:      #161b27;
-  --card-hover:#1c2336;
-  --border:    #232d42;
-  --accent1:   #6366f1;
-  --accent2:   #8b5cf6;
-  --accent-grad: linear-gradient(135deg, #6366f1, #8b5cf6);
-  --text:      #e2e8f0;
-  --muted:     #64748b;
-  --muted2:    #94a3b8;
+  --bg:        #070f1d;
+  --card:      #0c1a2e;
+  --card-hover:#101f36;
+  --border:    #18304d;
+  --accent1:   #0ea5e9;
+  --accent2:   #38bdf8;
+  --accent-grad: linear-gradient(135deg, #0284c7, #0ea5e9);
+  --text:      #dde8f5;
+  --muted:     #5a7a9c;
+  --muted2:    #7ba3c4;
   --amber:     #f59e0b;
-  --amber-bg:  #1c1400;
-  /* science canvas vars (keep existing) */
-  --sci-bg:    #0a0e1a;
-  --sci-panel: #111827;
-  --sci-border:#1f2d45;
-  --sci-accent:#00d4ff;
+  --amber-bg:  #160e00;
+  --med-green: #10b981;
+  --med-red:   #ef4444;
+  --sci-bg:    #050d1a;
+  --sci-panel: #0c1a2e;
+  --sci-border:#18304d;
+  --sci-accent:#0ea5e9;
   --A:         #00cc44;
   --T:         #ff3355;
   --G:         #3399ff;
   --C:         #ffaa00;
-  --muted-sci: #4a5f7a;
+  --muted-sci: #3a5f7a;
 }
 html { scroll-behavior: smooth; }
 body {
@@ -55,16 +56,33 @@ body {
    HEADER
 ══════════════════════════════════════════════════════════════ */
 #site-header {
-  padding: 1rem 2rem;
+  padding: 0.75rem 2rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: rgba(13,17,23,0.92);
-  backdrop-filter: blur(12px);
+  background: rgba(7,15,29,0.96);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 100;
+  box-shadow: 0 2px 24px rgba(0,0,0,0.5);
+}
+/* ECG pulse line behind header */
+#site-header::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #0ea5e9 40%, #38bdf8 60%, transparent 100%);
+  animation: ecg-sweep 3s linear infinite;
+  opacity: 0.6;
+}
+@keyframes ecg-sweep {
+  0%   { background-position: -100% 0; transform: scaleX(0) translateX(-100%); }
+  50%  { transform: scaleX(1) translateX(0); }
+  100% { transform: scaleX(0) translateX(100%); }
 }
 .header-logo {
   font-size: 1.5rem;
@@ -72,13 +90,38 @@ body {
   text-decoration: none;
 }
 .header-brand {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
   background: var(--accent-grad);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.header-medical-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(14,165,233,0.1);
+  border: 1px solid rgba(14,165,233,0.25);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.68rem;
+  color: #38bdf8;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.header-status-dot {
+  width: 6px; height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+  50%       { opacity: 0.8; box-shadow: 0 0 0 5px rgba(16,185,129,0); }
 }
 .header-tagline {
   font-size: 0.78rem;
@@ -137,7 +180,7 @@ body {
   justify-content: center;
   text-align: center;
   overflow: hidden;
-  background: linear-gradient(180deg, #0d1117 0%, #111827 100%);
+  background: linear-gradient(180deg, #070f1d 0%, #0c1a2e 100%);
   border-bottom: 1px solid var(--border);
 }
 #mini-helix {
@@ -199,6 +242,140 @@ body {
 }
 #demo-banner.visible { display: flex; }
 .demo-banner-icon { font-size: 1rem; }
+
+/* ══════════════════════════════════════════════════════════════
+   MEDICAL CLINICAL COMPONENTS
+══════════════════════════════════════════════════════════════ */
+
+/* Vital sign readout style */
+.vital-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent1);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.vital-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent1);
+}
+.vital-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.vital-unit {
+  font-size: 0.72rem;
+  color: var(--muted2);
+}
+
+/* Clinical record style card */
+.clinical-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.clinical-card-header {
+  padding: 0.6rem 1rem;
+  background: rgba(14,165,233,0.07);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent1);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.clinical-card-body { padding: 1rem; }
+
+/* AJAX loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--card) 25%, var(--card-hover) 50%, var(--card) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Medical alert badge */
+.med-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.med-alert-badge.critical { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+.med-alert-badge.caution  { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+.med-alert-badge.normal   { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+
+/* Heartbeat pulse animation for active data */
+.heartbeat {
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  15%       { transform: scale(1.15); }
+  30%       { transform: scale(1); }
+  45%       { transform: scale(1.08); }
+}
+
+/* AJAX progress ring */
+.ajax-ring {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent1);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Trait card hover — medical blue instead of indigo */
+.trait-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  border-color: rgba(14,165,233,0.35);
+  background: var(--card-hover);
+}
+
+/* Tab bar medical styling */
+#main-tab-bar {
+  background: rgba(7,15,29,0.97) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4) !important;
+}
+.main-tab-btn.active {
+  background: rgba(14,165,233,0.12) !important;
+  border-color: var(--accent1) !important;
+  color: #38bdf8 !important;
+}
+.main-tab-btn:hover:not(.active) {
+  border-color: rgba(14,165,233,0.3) !important;
+  color: var(--text) !important;
+}
+.cat-pill.active {
+  background: rgba(14,165,233,0.15) !important;
+  border-color: var(--accent1) !important;
+  color: #38bdf8 !important;
+}
 
 /* ══════════════════════════════════════════════════════════════
    CATEGORY PILLS
@@ -584,7 +761,7 @@ body {
 .trait-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-  border-color: rgba(99,102,241,0.3);
+  border-color: rgba(14,165,233,0.35);
   background: var(--card-hover);
 }
 
@@ -934,6 +1111,8 @@ body {
   align-items: center;
   text-align: center;
   gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
 }
 .landing-dna-icon { font-size: 3.5rem; line-height: 1; }
 .landing-title {
@@ -1567,6 +1746,7 @@ body {
   #sci-aside { grid-row: auto; border-right: none; border-bottom: 1px solid #1f2d45; }
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
@@ -1616,14 +1796,20 @@ body {
      HEADER
 ══════════════════════════════════════════════════════════════ -->
 <header id="site-header">
-  <span class="header-logo">🧬</span>
-  <div>
-    <div class="header-brand">HealthAgent</div>
-    <div class="header-tagline">Your personal wellness story</div>
+  <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+    <span style="font-size:1.3rem">⚕</span>
+    <div>
+      <div class="header-brand">HealthAgent</div>
+      <div class="header-tagline" style="font-size:0.7rem">Genomic Wellness Platform</div>
+    </div>
+  </div>
+  <div style="margin-left:0.75rem;">
+    <div class="header-medical-badge"><div class="header-status-dot"></div> System Online</div>
   </div>
   <div class="header-actions">
     <button class="btn" onclick="loadDemo()">Try Demo</button>
-    <button class="btn-primary" onclick="document.getElementById('file-input').click()">Upload Your DNA</button>
+    <button class="btn" id="clear-data-btn" onclick="clearAllData()" style="display:none;border-color:rgba(239,68,68,0.4);color:#ef4444;" title="Delete your DNA data from this device">🗑 Clear Data</button>
+    <button class="btn-primary" onclick="document.getElementById('file-input').click()">⬆ Upload DNA</button>
     <input type="file" id="file-input" accept=".txt,.csv,.tsv,.vcf" onchange="uploadFile(this)">
   </div>
 </header>
@@ -1657,9 +1843,11 @@ body {
 ══════════════════════════════════════════════════════════════ -->
 <div id="landing-page">
   <div class="landing-hero">
-    <div class="landing-dna-icon">🧬</div>
+  <canvas id="dna3d-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.35;pointer-events:none;"></canvas>
+  <div style="position:relative;z-index:1;">
+    <div style="font-size:3rem;margin-bottom:0.5rem;">⚕</div>
     <h1 class="landing-title">HealthAgent</h1>
-    <p class="landing-tagline">Your personal wellness story, written in your DNA</p>
+    <p class="landing-tagline">Clinical genomics, personalised for you</p>
     <div class="landing-actions">
       <button class="btn-primary landing-upload-btn" onclick="document.getElementById('file-input').click()">
         📂 Upload your DNA file
@@ -1668,6 +1856,7 @@ body {
       <button class="btn landing-demo-btn" onclick="loadDemo()">✨ Try the demo</button>
     </div>
     <p class="landing-formats">Supports 23andMe · AncestryDNA · MyHeritage · FTDNA · VCF</p>
+  </div>
   </div>
 
   <div class="landing-features">
@@ -2702,6 +2891,9 @@ function _revealApp() {
   const footer = document.getElementById('db-status-footer');
   if (footer) footer.style.display = '';
   DBFooter.load();
+  // Show clear-data button
+  const cb = document.getElementById('clear-data-btn');
+  if (cb) cb.style.display = '';
 }
 
 async function afterLoad(info) {
@@ -2723,9 +2915,21 @@ async function afterLoad(info) {
   const scanBtn = document.getElementById('chrom-scan-btn');
   if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '🔬 Scan chromosomes'; }
 
+  // Show Genome UID in hero bar and header
+  if (info.genome_uid) {
+    const heroCount = document.getElementById('hero-count');
+    if (heroCount) {
+      heroCount.classList.remove('hidden');
+      heroCount.innerHTML = `<span>🧬</span><span style="font-family:monospace;letter-spacing:0.04em">${_esc(info.genome_uid)}</span>`;
+    }
+    // Also stamp the UID on the medical badge
+    const badge = document.querySelector('.header-medical-badge');
+    if (badge) badge.title = `Genome UID: ${info.genome_uid}`;
+  }
+
   // Update science section stats
   document.getElementById('sci-status').textContent =
-    `${info.filename}  ·  ${info.format}  ·  ${(info.snp_count||0).toLocaleString()} SNPs`;
+    `${info.filename}  ·  ${info.format}  ·  ${(info.snp_count||0).toLocaleString()} SNPs${info.genome_uid ? '  ·  ' + info.genome_uid : ''}`;
   document.getElementById('st-format').textContent = info.format || '—';
   document.getElementById('st-snps').textContent   = (info.snp_count||0).toLocaleString();
 
@@ -3835,9 +4039,10 @@ window.addEventListener('load', async () => {
     if (prof && prof.snp_count > 0) {
       _revealApp();
       await afterLoad({
-        filename:  prof.filename  || 'loaded',
-        format:    prof.format    || '',
-        snp_count: prof.snp_count || 0,
+        filename:   prof.filename   || 'loaded',
+        format:     prof.format     || '',
+        snp_count:  prof.snp_count  || 0,
+        genome_uid: prof.genome_uid || null,
       });
     }
   } catch(_) { /* no profile yet — stay on landing page */ }
@@ -4497,6 +4702,93 @@ const MedDNA = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
+//  LOCAL USER IDENTITY — UUID + encrypted local cache
+// ═══════════════════════════════════════════════════════════════════
+const UserIdentity = (() => {
+  const KEY = 'ha_user_uuid';
+
+  function _generate() {
+    // RFC 4122 v4 UUID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = crypto.getRandomValues(new Uint8Array(1))[0] & 0xff;
+      return (c === 'x' ? r & 0xf : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function getOrCreate() {
+    let id = localStorage.getItem(KEY);
+    if (!id) { id = _generate(); localStorage.setItem(KEY, id); }
+    return id;
+  }
+
+  // Derive a 256-bit AES-GCM key from the UUID (PBKDF2, salt = 'ha-salt')
+  async function _deriveKey(uuid) {
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey('raw', enc.encode(uuid), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: enc.encode('ha-salt-v1'), iterations: 100000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+    );
+  }
+
+  async function encryptJSON(obj) {
+    const uuid = getOrCreate();
+    const key  = await _deriveKey(uuid);
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const enc  = new TextEncoder();
+    const ct   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+    // store as base64:iv:ciphertext
+    const b64  = v => btoa(String.fromCharCode(...new Uint8Array(v)));
+    return `${b64(iv)}:${b64(ct)}`;
+  }
+
+  async function decryptJSON(blob) {
+    try {
+      const [ivB64, ctB64] = blob.split(':');
+      const b64d  = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+      const iv    = b64d(ivB64);
+      const ct    = b64d(ctB64);
+      const uuid  = getOrCreate();
+      const key   = await _deriveKey(uuid);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+      return JSON.parse(new TextDecoder().decode(plain));
+    } catch { return null; }
+  }
+
+  async function storeEncrypted(storageKey, obj) {
+    const blob = await encryptJSON(obj);
+    localStorage.setItem(storageKey, blob);
+  }
+
+  async function loadEncrypted(storageKey) {
+    const blob = localStorage.getItem(storageKey);
+    if (!blob || !blob.includes(':')) return null;
+    return decryptJSON(blob);
+  }
+
+  return { getOrCreate, storeEncrypted, loadEncrypted, encryptJSON, decryptJSON };
+})();
+
+// ── Clear all personal data ────────────────────────────────────────
+async function clearAllData() {
+  if (!confirm('Delete all your DNA data from this device? This cannot be undone.')) return;
+  try {
+    await apiFetch('/api/clear', { method: 'DELETE' });
+  } catch(_) {}
+  // Clear local encrypted medicine store
+  localStorage.removeItem('ha_medicines');
+  localStorage.removeItem('ha_medicines_v2');
+  // Show landing page
+  const shell = document.getElementById('app-shell');
+  if (shell) shell.style.display = 'none';
+  const landing = document.getElementById('landing-page');
+  if (landing) landing.style.display = '';
+  const footer = document.getElementById('db-status-footer');
+  if (footer) footer.style.display = 'none';
+  document.getElementById('clear-data-btn').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  DB STATUS FOOTER
 // ═══════════════════════════════════════════════════════════════════
 const DBFooter = {
@@ -4538,6 +4830,98 @@ const DBFooter = {
     } catch(e) { /* silent */ }
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════
+//  THREE.JS 3D DNA DOUBLE HELIX
+// ═══════════════════════════════════════════════════════════════════
+(function initDNA3D() {
+  if (typeof THREE === 'undefined') return;
+  const canvas = document.getElementById('dna3d-canvas');
+  if (!canvas) return;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 200);
+  camera.position.set(0, 0, 28);
+
+  const TURNS = 4, STEPS = 80, RADIUS = 3.5, PITCH = 2.2;
+  const colA = 0x0ea5e9, colB = 0x38bdf8, colBridge = 0x10b981;
+  const matA = new THREE.MeshStandardMaterial({ color: colA, emissive: colA, emissiveIntensity: 0.4, roughness: 0.3, metalness: 0.6 });
+  const matB = new THREE.MeshStandardMaterial({ color: colB, emissive: colB, emissiveIntensity: 0.4, roughness: 0.3, metalness: 0.6 });
+  const matBr = new THREE.MeshStandardMaterial({ color: colBridge, emissive: colBridge, emissiveIntensity: 0.2, roughness: 0.5, metalness: 0.3 });
+  const sphereGeo = new THREE.SphereGeometry(0.22, 10, 10);
+  const cylGeo    = new THREE.CylinderGeometry(0.06, 0.06, 1, 8);
+  const bridgeGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 6);
+
+  const group = new THREE.Group();
+  const total = TURNS * STEPS;
+  const strandA = [], strandB = [];
+
+  for (let i = 0; i <= total; i++) {
+    const t     = i / total;
+    const angle = t * TURNS * Math.PI * 2;
+    const y     = (t - 0.5) * TURNS * PITCH;
+    const xa = Math.cos(angle) * RADIUS,  za = Math.sin(angle) * RADIUS;
+    const xb = Math.cos(angle + Math.PI) * RADIUS, zb = Math.sin(angle + Math.PI) * RADIUS;
+    strandA.push(new THREE.Vector3(xa, y, za));
+    strandB.push(new THREE.Vector3(xb, y, zb));
+    // Nodes
+    const sA = new THREE.Mesh(sphereGeo, matA.clone()); sA.position.set(xa, y, za);
+    const sB = new THREE.Mesh(sphereGeo, matB.clone()); sB.position.set(xb, y, zb);
+    group.add(sA, sB);
+    // Bridge every 4 steps
+    if (i % 4 === 0) {
+      const mid = new THREE.Vector3((xa + xb) / 2, y, (za + zb) / 2);
+      const len = new THREE.Vector3(xa, y, za).distanceTo(new THREE.Vector3(xb, y, zb));
+      const br  = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, len, 6), matBr.clone());
+      br.position.copy(mid);
+      br.lookAt(new THREE.Vector3(xb, y, zb));
+      br.rotateX(Math.PI / 2);
+      group.add(br);
+    }
+  }
+  // Backbone tubes
+  function makeTube(pts, mat) {
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const geo   = new THREE.TubeGeometry(curve, pts.length * 3, 0.08, 8, false);
+    group.add(new THREE.Mesh(geo, mat));
+  }
+  makeTube(strandA, matA);
+  makeTube(strandB, matB);
+  scene.add(group);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const pt1 = new THREE.PointLight(0x0ea5e9, 2, 60); pt1.position.set(10, 10, 10); scene.add(pt1);
+  const pt2 = new THREE.PointLight(0x38bdf8, 1.5, 60); pt2.position.set(-10, -5, 5); scene.add(pt2);
+
+  let rafId;
+  function resizeDNA() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+
+  function animateDNA(t) {
+    rafId = requestAnimationFrame(animateDNA);
+    resizeDNA();
+    group.rotation.y = t * 0.0004;
+    group.rotation.x = Math.sin(t * 0.0001) * 0.15;
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(animateDNA);
+
+  // Pause when off-screen
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) cancelAnimationFrame(rafId);
+    else requestAnimationFrame(animateDNA);
+  });
+})();
 </script>
 
 <!-- ── DB Status Footer ───────────────────────────────────────────── -->
