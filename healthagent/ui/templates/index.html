@@ -453,6 +453,59 @@ body {
 .sev-pill[data-sev="low"].active    { background:rgba(34,197,94,0.15);  border-color:#22c55e; color:#4ade80; }
 .sev-pill[data-sev="all"].active    { background:rgba(99,102,241,0.15); border-color:var(--accent1); color:#a5b4fc; }
 
+/* ── Source / database filter bar ─────────────────────────── */
+#source-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 1.5rem 0.55rem;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.src-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted2);
+  font-size: 0.73rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.src-pill:hover { border-color: var(--accent1); color: var(--text); }
+.src-pill.active { background: rgba(14,165,233,0.13); border-color: var(--accent1); color: #38bdf8; }
+.src-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted2);
+  letter-spacing: 0.01em;
+}
+.src-pill.active .src-count { background: rgba(14,165,233,0.2); color: #7dd3fc; }
+.src-pill.has-data .src-count { color: var(--med-green); }
+.src-pill.no-data  { opacity: 0.45; cursor: default; }
+.src-pill.no-data:hover { border-color: var(--border); color: var(--muted2); }
+/* Download progress ring on pill */
+.src-pill .src-progress {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--accent1);
+  animation: spin 0.9s linear infinite;
+  display: none;
+}
+.src-pill.downloading .src-progress { display: inline-block; }
+.src-pill.downloading .src-count    { display: none; }
+
 /* ── Medicine list tab ─────────────────────────────────────── */
 #tab-pane-medicines { padding: 2rem; max-width: 900px; margin: 0 auto; }
 .med-tab-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; }
@@ -1941,6 +1994,21 @@ body {
     <button class="sev-pill"        data-sev="low"    onclick="TraitUI.filterSeverity('low',this)">🟢 Low</button>
   </div>
 
+  <!-- source / database filter bar -->
+  <div id="source-bar">
+    <span class="severity-label">Source:</span>
+    <button class="src-pill active" data-src="all"          onclick="TraitUI.filterSource('all',this)">All</button>
+    <button class="src-pill"        data-src="wellness"     onclick="TraitUI.filterSource('wellness',this)">🌿 Wellness Traits <span class="src-count" id="src-count-wellness">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="gwas"         onclick="TraitUI.filterSource('gwas',this)">🔬 GWAS Catalog <span class="src-count" id="src-count-gwas">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="clinvar"      onclick="TraitUI.filterSource('clinvar',this)">🏥 ClinVar <span class="src-count" id="src-count-clinvar">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="drugs"        onclick="TraitUI.filterSource('drugs',this)">💊 PharmGKB <span class="src-count" id="src-count-drugs">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="ensembl"      onclick="TraitUI.filterSource('ensembl',this)">🧬 Ensembl VEP <span class="src-count" id="src-count-ensembl">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="disgenet"     onclick="TraitUI.filterSource('disgenet',this)">🦠 DisGeNET <span class="src-count" id="src-count-disgenet">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="opentargets"  onclick="TraitUI.filterSource('opentargets',this)">🎯 OpenTargets <span class="src-count" id="src-count-opentargets">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="finngen"      onclick="TraitUI.filterSource('finngen',this)">🏥 FinnGen <span class="src-count" id="src-count-finngen">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="tcga"         onclick="TraitUI.filterSource('tcga',this)">🔭 TCGA <span class="src-count" id="src-count-tcga">—</span><span class="src-progress"></span></button>
+  </div>
+
   <!-- main content (empty-state + trait grid) -->
   <div id="main-content">
 
@@ -2356,6 +2424,7 @@ const TraitUI = {
   allTraits: [],
   activeCategory: 'all',
   activeSeverity: 'all',
+  activeSource:   'all',
 
   // Category name normalisation map
   CAT_MAP: {
@@ -2383,14 +2452,21 @@ const TraitUI = {
       const data = await apiFetch('/api/traits');
       // Filter out any cards with no trait_name (shouldn't happen after server fix, but guard)
       const validTrait = t => !!(t.trait_name || t.condition || t.drug_name);
+      const tag = (arr, src) => (arr || []).filter(validTrait).map(t => ({...t, _source: src}));
       this.allTraits = [
-        ...(data.wellness || []).filter(validTrait),
-        ...(data.gwas     || []).filter(validTrait),
-        ...(data.clinvar  || []).filter(validTrait),
-        ...(data.drugs    || []).filter(validTrait),
+        ...tag(data.wellness,    'wellness'),
+        ...tag(data.gwas,        'gwas'),
+        ...tag(data.clinvar,     'clinvar'),
+        ...tag(data.drugs,       'drugs'),
+        ...tag(data.disgenet,    'disgenet'),
+        ...tag(data.opentargets, 'opentargets'),
+        ...tag(data.ensembl,     'ensembl'),
+        ...tag(data.biobank,     'finngen'),
+        ...tag(data.tcga,        'tcga'),
       ];
       this.render();
       this.updateHeroCount(this.allTraits.length);
+      this.updateSourceCounts(data);
 
       // Show pending banner if GWAS + ClinVar + drugs are all empty (db not downloaded yet)
       const pendingBanner = document.getElementById('pending-traits-banner');
@@ -2431,6 +2507,60 @@ const TraitUI = {
     this.render();
   },
 
+  filterSource(src, btn) {
+    // no-data pills are disabled
+    if (btn && btn.classList.contains('no-data')) return;
+    this.activeSource = src;
+    document.querySelectorAll('.src-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    this.render();
+  },
+
+  updateSourceCounts(data) {
+    // DB record counts from summary
+    const db   = (data.summary || {}).db_stats || {};
+    const dl   = {};  // download progress if available (populated by _dl_progress polling)
+
+    const SRC_DB_MAP = {
+      wellness:     db.wellness_trait       || 0,
+      gwas:         db.gwas_association     || 0,
+      clinvar:      db.clinvar_variant      || 0,
+      drugs:        db.drug_interaction     || 0,
+      ensembl:      db.ensembl_consequence  || 0,
+      disgenet:     db.disgenet_association || 0,
+      opentargets:  db.opentargets_association || 0,
+      finngen:      db.biobank_phenotype    || 0,
+      tcga:         (data.tcga || []).length || 0,
+    };
+
+    // Count matched traits per source
+    const matchCounts = {};
+    this.allTraits.forEach(t => {
+      const s = t._source || 'wellness';
+      matchCounts[s] = (matchCounts[s] || 0) + 1;
+    });
+
+    Object.entries(SRC_DB_MAP).forEach(([src, dbCount]) => {
+      const pill    = document.querySelector(`.src-pill[data-src="${src}"]`);
+      const countEl = document.getElementById(`src-count-${src}`);
+      if (!pill || !countEl) return;
+
+      const matched = matchCounts[src] || 0;
+
+      if (dbCount > 0) {
+        countEl.textContent = matched > 0
+          ? matched.toLocaleString()
+          : dbCount.toLocaleString() + ' records';
+        pill.classList.add('has-data');
+        pill.classList.remove('no-data');
+      } else {
+        countEl.textContent = '—';
+        pill.classList.add('no-data');
+        pill.classList.remove('has-data');
+      }
+    });
+  },
+
   _severityOf(trait) {
     const r = (trait.risk_level || '').toLowerCase();
     if (r === 'elevated') return 'high';
@@ -2444,12 +2574,18 @@ const TraitUI = {
     const cat   = this.activeCategory;
     const sev   = this.activeSeverity;
 
+    const src = this.activeSource;
+
     let filtered = cat === 'all'
       ? this.allTraits
       : this.allTraits.filter(t => {
           const c = (t.category || '').toLowerCase();
           return c.includes(cat) || (t.category_label || '').toLowerCase().includes(cat);
         });
+
+    if (src !== 'all') {
+      filtered = filtered.filter(t => (t._source || 'wellness') === src);
+    }
 
     if (sev !== 'all') {
       filtered = filtered.filter(t => this._severityOf(t) === sev);
@@ -3038,12 +3174,42 @@ function _hideProgressPanel() {
   if (panel) panel.classList.add('hidden');
 }
 
+// Map download task keys → source pill data-src values
+const _DL_SRC_MAP = {
+  wellness:    'wellness',
+  gwas:        'gwas',
+  clinvar:     'clinvar',
+  pharmgkb:    'drugs',
+  ensembl:     'ensembl',
+  disgenet:    'disgenet',
+  opentargets: 'opentargets',
+  finngen:     'finngen',
+};
+
+function _updateSourcePillsFromProgress(prog) {
+  const tasks = prog.tasks || {};
+  Object.entries(_DL_SRC_MAP).forEach(([taskKey, src]) => {
+    const pill    = document.querySelector(`.src-pill[data-src="${src}"]`);
+    const countEl = document.getElementById(`src-count-${src}`);
+    if (!pill || !countEl) return;
+    const task = tasks[taskKey];
+    if (!task) return;
+    if (prog.active && !task.done && prog.current_task === taskKey) {
+      pill.classList.add('downloading');
+      countEl.textContent = task.pct ? task.pct + '%' : '…';
+    } else if (task.done) {
+      pill.classList.remove('downloading');
+    }
+  });
+}
+
 function _startProgressPoll() {
   if (_dlPollTimer) return;
   _dlPollTimer = setInterval(async () => {
     try {
       const prog = await apiFetch('/api/db/progress');
       _showProgressPanel(prog);
+      _updateSourcePillsFromProgress(prog);
       const pctEl  = document.getElementById('dl-progress-pct');
       const text   = document.getElementById('db-status-text');
       const fill   = document.getElementById('dl-progress-fill');
@@ -3052,7 +3218,12 @@ function _startProgressPoll() {
       if (text)   text.textContent   = `Downloading databases… ${prog.overall_pct}%`;
       if (!prog.active) {
         _stopProgressPoll();
-        setTimeout(() => { _hideProgressPanel(); loadDbStatus(); }, 1500);
+        // Reload traits to pick up newly downloaded data
+        setTimeout(() => {
+          _hideProgressPanel();
+          loadDbStatus();
+          TraitUI.load();
+        }, 1500);
       }
     } catch(_) { _stopProgressPoll(); }
   }, 1500);
