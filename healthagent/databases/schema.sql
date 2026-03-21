@@ -191,6 +191,84 @@ CREATE TABLE IF NOT EXISTS microbiome_session (
     uploaded_at     TEXT DEFAULT (datetime('now'))
 );
 
+-- ── gnomAD allele frequencies ────────────────────────────────────
+-- Source: https://gnomad.broadinstitute.org (CC BY 4.0)
+-- Population allele frequencies for variant interpretation
+CREATE TABLE IF NOT EXISTS gnomad_frequency (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    rsid        TEXT NOT NULL,
+    af_global   REAL,       -- global allele frequency
+    af_afr      REAL,       -- African / African-American
+    af_amr      REAL,       -- Latino / Admixed American
+    af_asj      REAL,       -- Ashkenazi Jewish
+    af_eas      REAL,       -- East Asian
+    af_fin      REAL,       -- Finnish European
+    af_nfe      REAL,       -- Non-Finnish European
+    af_sas      REAL,       -- South Asian
+    ac_global   INTEGER,    -- alt allele count
+    an_global   INTEGER,    -- total alleles (coverage depth proxy)
+    hom_count   INTEGER,    -- homozygous alt count
+    downloaded_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(rsid)
+);
+
+-- ── GTEx eQTLs ────────────────────────────────────────────────────
+-- Source: https://gtexportal.org (dbGaP Accession phs000424, Open Access summary)
+-- Expression quantitative trait loci: SNP → tissue-specific gene expression
+CREATE TABLE IF NOT EXISTS gtex_eqtl (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    gene_symbol     TEXT NOT NULL,
+    tissue          TEXT NOT NULL,
+    rsid            TEXT,
+    effect_size     REAL,           -- beta (log2 fold-change proxy)
+    pval            REAL,           -- nominal p-value
+    direction       TEXT,           -- '+' or '-'
+    downloaded_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(gene_symbol, tissue)
+);
+
+-- ── Reactome biological pathways ─────────────────────────────────
+-- Source: https://reactome.org (CC BY 4.0)
+-- Gene → biological pathway membership
+CREATE TABLE IF NOT EXISTS reactome_pathway (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    gene_symbol     TEXT NOT NULL,
+    pathway_id      TEXT NOT NULL,
+    pathway_name    TEXT NOT NULL,
+    top_level_pathway TEXT,
+    downloaded_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(gene_symbol, pathway_id)
+);
+
+-- ── UniProt protein function & disease ────────────────────────────
+-- Source: https://uniprot.org (CC BY 4.0)
+-- Gene → protein function, disease associations, variant annotations
+CREATE TABLE IF NOT EXISTS uniprot_annotation (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    gene_symbol     TEXT NOT NULL,
+    uniprot_id      TEXT,
+    protein_name    TEXT,
+    function_text   TEXT,
+    disease_name    TEXT,
+    disease_mim     TEXT,       -- OMIM MIM number
+    downloaded_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(gene_symbol, disease_name)
+);
+
+-- ── ClinGen gene-disease validity ─────────────────────────────────
+-- Source: https://clinicalgenome.org (CC0 public domain)
+-- Expert-curated gene-disease relationship validity classifications
+CREATE TABLE IF NOT EXISTS clingen_validity (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    gene_symbol     TEXT NOT NULL,
+    disease_name    TEXT NOT NULL,
+    disease_mim     TEXT,
+    classification  TEXT,   -- Definitive, Strong, Moderate, Limited, Disputed, Refuted
+    moi             TEXT,   -- AD, AR, XL, XLD, XLR, YL, MT
+    downloaded_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(gene_symbol, disease_name, moi)
+);
+
 -- ── Indexes ───────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_gwas_rsid         ON gwas_association(rsid);
 CREATE INDEX IF NOT EXISTS idx_gwas_trait        ON gwas_association(trait);
@@ -207,3 +285,8 @@ CREATE INDEX IF NOT EXISTS idx_biobank_rsid      ON biobank_phenotype(rsid);
 CREATE INDEX IF NOT EXISTS idx_microbiome_session  ON microbiome_pathway(session_id);
 CREATE INDEX IF NOT EXISTS idx_microbiome_pathway  ON microbiome_pathway(pathway_id);
 CREATE INDEX IF NOT EXISTS idx_microbiome_category ON microbiome_pathway(health_category);
+CREATE INDEX IF NOT EXISTS idx_gnomad_rsid        ON gnomad_frequency(rsid);
+CREATE INDEX IF NOT EXISTS idx_gtex_gene          ON gtex_eqtl(gene_symbol);
+CREATE INDEX IF NOT EXISTS idx_reactome_gene      ON reactome_pathway(gene_symbol);
+CREATE INDEX IF NOT EXISTS idx_uniprot_gene       ON uniprot_annotation(gene_symbol);
+CREATE INDEX IF NOT EXISTS idx_clingen_gene       ON clingen_validity(gene_symbol);

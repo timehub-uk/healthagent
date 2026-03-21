@@ -1262,18 +1262,505 @@ def download_opentargets(progress_cb: Callable[[str], None] = print) -> int:
     return count
 
 
+# ═══════════════════════════════════════════════════════════════════
+#  gnomAD ALLELE FREQUENCIES
+# ═══════════════════════════════════════════════════════════════════
+GNOMAD_GRAPHQL_URL = "https://gnomad.broadinstitute.org/api"
+
+
+def download_gnomad(rsids: list[str] = None, progress_cb: Callable[[str], None] = print) -> int:
+    """Query gnomAD for population allele frequencies.
+
+    What it is:
+        gnomAD (Genome Aggregation Database) aggregates whole-genome and
+        whole-exome sequencing data from 140,000+ individuals. It provides
+        per-variant allele frequencies across 7 population groups.
+
+    Why it matters for users:
+        Knowing how rare or common a variant is globally and in specific
+        populations helps contextualise risk — a variant at 0.001% frequency
+        is more clinically significant than one at 40%.
+
+    If rsids is None, pulls from existing gwas_association table (first 3000).
+    """
+    local_db.init_db()
+
+    if rsids is None:
+        rows = local_db.query("SELECT DISTINCT rsid FROM gwas_association LIMIT 3000")
+        rsids = [r["rsid"] for r in rows]
+
+    if not rsids:
+        progress_cb("[gnomAD] No rsids — seed GWAS data first.")
+        return 0
+
+    # Skip rsids already cached
+    existing = {r["rsid"] for r in local_db.query("SELECT rsid FROM gnomad_frequency")}
+    rsids = [r for r in rsids if r not in existing]
+
+    if not rsids:
+        progress_cb("[gnomAD] All rsids already cached.")
+        return 0
+
+    local_db.log_download("gnomad", "started")
+    progress_cb(f"[gnomAD] Fetching frequencies for {len(rsids):,} variants...")
+
+    QUERY = (
+        "query GV($rsid:String!){variant(rsid:$rsid,dataset:gnomad_r2_1)"
+        "{genome{ac an af hom populations{id ac an af}}}}"
+    )
+
+    rows_to_insert: list[tuple] = []
+    count = 0
+
+    for i, rsid in enumerate(rsids):
+        try:
+            payload = json.dumps({"query": QUERY, "variables": {"rsid": rsid}}).encode()
+            req = urllib.request.Request(
+                GNOMAD_GRAPHQL_URL,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "HealthAgent/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                result = json.loads(resp.read())
+
+            variant = (result.get("data") or {}).get("variant")
+            genome  = (variant or {}).get("genome")
+            if not genome:
+                continue
+
+            pops = {p["id"].lower(): p.get("af") for p in (genome.get("populations") or [])}
+            rows_to_insert.append((
+                rsid,
+                genome.get("af"), genome.get("hom"),
+                genome.get("ac"), genome.get("an"),
+                pops.get("afr"), pops.get("amr"), pops.get("asj"),
+                pops.get("eas"), pops.get("fin"), pops.get("nfe"), pops.get("sas"),
+            ))
+            count += 1
+
+            if len(rows_to_insert) >= 200:
+                _gnomad_flush(rows_to_insert)
+                rows_to_insert.clear()
+
+        except Exception:
+            pass
+
+        if (i + 1) % 100 == 0:
+            progress_cb(f"[gnomAD] {i+1}/{len(rsids)} queried, {count} hits...")
+        time.sleep(0.15)
+
+    if rows_to_insert:
+        _gnomad_flush(rows_to_insert)
+
+    local_db.log_download("gnomad", "completed", records=count)
+    progress_cb(f"[gnomAD] Done — {count:,} frequency records stored.")
+    return count
+
+
+def _gnomad_flush(rows: list[tuple]) -> None:
+    local_db.executemany(
+        """INSERT OR REPLACE INTO gnomad_frequency
+           (rsid, af_global, hom_count, ac_global, an_global,
+            af_afr, af_amr, af_asj, af_eas, af_fin, af_nfe, af_sas)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        rows,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  GTEx EXPRESSION QTLs
+# ═══════════════════════════════════════════════════════════════════
+GTEX_API_BASE = "https://gtexportal.org/api/v2"
+GTEX_KEY_TISSUES = [
+    "Whole_Blood", "Brain_Cortex", "Liver", "Heart_Left_Ventricle",
+    "Adipose_Subcutaneous", "Muscle_Skeletal", "Lung",
+]
+
+
+def download_gtex(genes: list[str] = None, progress_cb: Callable[[str], None] = print) -> int:
+    """Fetch GTEx v8 significant cis-eQTLs for genes.
+
+    What it is:
+        GTEx (Genotype-Tissue Expression) project maps SNPs that affect
+        gene expression in 54 human tissues. An eQTL means: this variant
+        changes how much of this gene is produced in this tissue.
+
+    Why it matters for users:
+        Even if a SNP doesn't change a protein directly, it may up- or
+        down-regulate gene expression in specific tissues — linking it to
+        tissue-level effects.
+
+    If genes is None, pulls from disgenet/opentargets gene lists.
+    """
+    local_db.init_db()
+
+    if genes is None:
+        rows = local_db.query(
+            "SELECT DISTINCT gene_symbol FROM disgenet_association LIMIT 500"
+        )
+        genes = [r["gene_symbol"] for r in rows if r["gene_symbol"]]
+
+    if not genes:
+        progress_cb("[GTEx] No genes to query.")
+        return 0
+
+    existing = {r["gene_symbol"] for r in local_db.query("SELECT DISTINCT gene_symbol FROM gtex_eqtl")}
+    genes = [g for g in genes if g not in existing]
+
+    if not genes:
+        progress_cb("[GTEx] All genes already cached.")
+        return 0
+
+    local_db.log_download("gtex", "started")
+    progress_cb(f"[GTEx] Fetching eQTLs for {len(genes):,} genes across {len(GTEX_KEY_TISSUES)} tissues...")
+
+    rows_to_insert: list[tuple] = []
+    count = 0
+
+    for i, gene in enumerate(genes):
+        for tissue in GTEX_KEY_TISSUES:
+            try:
+                url = (
+                    f"{GTEX_API_BASE}/association/singleTissueEqtl"
+                    f"?geneSymbol={gene}&tissueSiteDetailId={tissue}"
+                    f"&datasetId=gtex_v8&pageSize=1"
+                )
+                req = urllib.request.Request(url, headers={"User-Agent": "HealthAgent/1.0"})
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    data = json.loads(resp.read())
+
+                hits = (data.get("data") or [])
+                if hits:
+                    top = hits[0]
+                    ef = top.get("nes") or top.get("effectSize") or 0
+                    pv = top.get("pvalue") or top.get("pVal") or 1
+                    direction = "+" if ef >= 0 else "-"
+                    rsid = top.get("snpId") or top.get("rsId") or None
+                    rows_to_insert.append((gene, tissue, rsid, ef, pv, direction))
+                    count += 1
+
+            except Exception:
+                pass
+            time.sleep(0.05)
+
+        if len(rows_to_insert) >= 500:
+            local_db.executemany(
+                """INSERT OR REPLACE INTO gtex_eqtl (gene_symbol, tissue, rsid, effect_size, pval, direction)
+                   VALUES (?,?,?,?,?,?)""",
+                rows_to_insert,
+            )
+            rows_to_insert.clear()
+
+        if (i + 1) % 20 == 0:
+            progress_cb(f"[GTEx] {i+1}/{len(genes)} genes done, {count} eQTL hits...")
+
+    if rows_to_insert:
+        local_db.executemany(
+            """INSERT OR REPLACE INTO gtex_eqtl (gene_symbol, tissue, rsid, effect_size, pval, direction)
+               VALUES (?,?,?,?,?,?)""",
+            rows_to_insert,
+        )
+
+    local_db.log_download("gtex", "completed", records=count)
+    progress_cb(f"[GTEx] Done — {count:,} tissue eQTL records stored.")
+    return count
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  REACTOME BIOLOGICAL PATHWAYS
+# ═══════════════════════════════════════════════════════════════════
+REACTOME_API_BASE = "https://reactome.org/ContentService"
+
+
+def download_reactome(genes: list[str] = None, progress_cb: Callable[[str], None] = print) -> int:
+    """Fetch biological pathway memberships for genes from Reactome.
+
+    What it is:
+        Reactome is a free, curated knowledgebase of biological pathways.
+        It maps genes/proteins to the molecular processes they participate in
+        — from cellular metabolism to immune signalling.
+
+    Why it matters for users:
+        Knowing which pathways a gene participates in gives a mechanistic
+        context: "this variant is in a gene involved in DNA repair / lipid
+        metabolism / immune regulation".
+    """
+    local_db.init_db()
+
+    if genes is None:
+        rows = local_db.query(
+            "SELECT DISTINCT gene_symbol FROM disgenet_association LIMIT 400"
+        )
+        genes = [r["gene_symbol"] for r in rows if r["gene_symbol"]]
+
+    if not genes:
+        progress_cb("[Reactome] No genes to query.")
+        return 0
+
+    existing = {r["gene_symbol"] for r in local_db.query("SELECT DISTINCT gene_symbol FROM reactome_pathway")}
+    genes = [g for g in genes if g not in existing]
+
+    if not genes:
+        progress_cb("[Reactome] All genes already cached.")
+        return 0
+
+    local_db.log_download("reactome", "started")
+    progress_cb(f"[Reactome] Fetching pathways for {len(genes):,} genes...")
+
+    rows_to_insert: list[tuple] = []
+    count = 0
+
+    for i, gene in enumerate(genes):
+        try:
+            url = f"{REACTOME_API_BASE}/data/pathways/low/entity/{gene}?species=9606"
+            req = urllib.request.Request(url, headers={"User-Agent": "HealthAgent/1.0"})
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                pathways = json.loads(resp.read())
+
+            if isinstance(pathways, list):
+                for pw in pathways[:15]:
+                    pid  = pw.get("stId") or pw.get("dbId") or ""
+                    name = pw.get("displayName") or pw.get("name") or ""
+                    top  = (pw.get("schemaClass") or "")
+                    if pid and name:
+                        rows_to_insert.append((gene, str(pid), name, top))
+                        count += 1
+
+        except Exception:
+            pass
+
+        if len(rows_to_insert) >= 500:
+            local_db.executemany(
+                """INSERT OR IGNORE INTO reactome_pathway (gene_symbol, pathway_id, pathway_name, top_level_pathway)
+                   VALUES (?,?,?,?)""",
+                rows_to_insert,
+            )
+            rows_to_insert.clear()
+
+        if (i + 1) % 30 == 0:
+            progress_cb(f"[Reactome] {i+1}/{len(genes)} genes done, {count} pathway entries...")
+        time.sleep(0.1)
+
+    if rows_to_insert:
+        local_db.executemany(
+            """INSERT OR IGNORE INTO reactome_pathway (gene_symbol, pathway_id, pathway_name, top_level_pathway)
+               VALUES (?,?,?,?)""",
+            rows_to_insert,
+        )
+
+    local_db.log_download("reactome", "completed", records=count)
+    progress_cb(f"[Reactome] Done — {count:,} pathway-gene associations stored.")
+    return count
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  UniProt PROTEIN FUNCTION & DISEASE
+# ═══════════════════════════════════════════════════════════════════
+UNIPROT_REST_BASE = "https://rest.uniprot.org/uniprotkb/search"
+
+
+def download_uniprot(genes: list[str] = None, progress_cb: Callable[[str], None] = print) -> int:
+    """Fetch protein function and disease annotations from UniProt.
+
+    What it is:
+        UniProt/Swiss-Prot is the gold-standard curated protein database.
+        For each gene it provides: protein function, known associated
+        diseases, natural variants, and molecular mechanisms.
+
+    Why it matters for users:
+        Plain-English protein function descriptions and known disease
+        links directly enrich the clinical context of any gene finding.
+    """
+    local_db.init_db()
+
+    if genes is None:
+        rows = local_db.query(
+            "SELECT DISTINCT gene_symbol FROM disgenet_association LIMIT 400"
+        )
+        genes = [r["gene_symbol"] for r in rows if r["gene_symbol"]]
+
+    if not genes:
+        progress_cb("[UniProt] No genes to query.")
+        return 0
+
+    existing = {r["gene_symbol"] for r in local_db.query("SELECT DISTINCT gene_symbol FROM uniprot_annotation")}
+    genes = [g for g in genes if g not in existing]
+
+    if not genes:
+        progress_cb("[UniProt] All genes already cached.")
+        return 0
+
+    local_db.log_download("uniprot", "started")
+    progress_cb(f"[UniProt] Fetching annotations for {len(genes):,} genes...")
+
+    rows_to_insert: list[tuple] = []
+    count = 0
+
+    FIELDS = "accession,gene_names,protein_name,cc_disease,cc_function"
+
+    for i, gene in enumerate(genes):
+        try:
+            query = f"gene_exact:{gene}+AND+organism_id:9606+AND+reviewed:true"
+            url = f"{UNIPROT_REST_BASE}?query={query}&format=json&fields={FIELDS}&size=1"
+            req = urllib.request.Request(url, headers={"User-Agent": "HealthAgent/1.0"})
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read())
+
+            for entry in (data.get("results") or [])[:1]:
+                uid  = entry.get("primaryAccession", "")
+                pname = (((entry.get("proteinDescription") or {}).get("recommendedName") or {})
+                         .get("fullName", {}).get("value", ""))
+
+                func_text = ""
+                for comment in (entry.get("comments") or []):
+                    if comment.get("commentType") == "FUNCTION":
+                        texts = comment.get("texts") or []
+                        if texts:
+                            func_text = texts[0].get("value", "")
+                            break
+
+                diseases = []
+                for comment in (entry.get("comments") or []):
+                    if comment.get("commentType") == "DISEASE":
+                        disease = comment.get("disease") or {}
+                        dname = disease.get("diseaseId") or disease.get("diseaseDescription", {}).get("value", "")
+                        dmim  = (disease.get("diseaseCrossReference") or {}).get("id", "")
+                        if dname:
+                            diseases.append((dname, dmim))
+
+                if not diseases:
+                    rows_to_insert.append((gene, uid, pname, func_text, "", ""))
+                    count += 1
+                else:
+                    for dname, dmim in diseases[:5]:
+                        rows_to_insert.append((gene, uid, pname, func_text, dname, dmim))
+                        count += 1
+
+        except Exception:
+            pass
+
+        if len(rows_to_insert) >= 500:
+            _uniprot_flush(rows_to_insert)
+            rows_to_insert.clear()
+
+        if (i + 1) % 30 == 0:
+            progress_cb(f"[UniProt] {i+1}/{len(genes)} genes done, {count} annotations...")
+        time.sleep(0.1)
+
+    if rows_to_insert:
+        _uniprot_flush(rows_to_insert)
+
+    local_db.log_download("uniprot", "completed", records=count)
+    progress_cb(f"[UniProt] Done — {count:,} protein-disease annotations stored.")
+    return count
+
+
+def _uniprot_flush(rows: list[tuple]) -> None:
+    local_db.executemany(
+        """INSERT OR IGNORE INTO uniprot_annotation
+           (gene_symbol, uniprot_id, protein_name, function_text, disease_name, disease_mim)
+           VALUES (?,?,?,?,?,?)""",
+        rows,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  ClinGen GENE-DISEASE VALIDITY
+# ═══════════════════════════════════════════════════════════════════
+CLINGEN_CSV_URL = "https://search.clinicalgenome.org/kb/gene-validity.csv"
+
+
+def download_clingen(progress_cb: Callable[[str], None] = print) -> int:
+    """Download ClinGen expert-curated gene-disease validity assertions.
+
+    What it is:
+        ClinGen's Gene-Disease Validity Curation classifies each gene-disease
+        pair as Definitive, Strong, Moderate, Limited, Disputed, or Refuted
+        based on expert review of the published evidence.
+
+    Why it matters for users:
+        It provides authoritative clinical validity context: is this gene
+        actually proven to cause this disease, or is the evidence weak?
+    """
+    local_db.log_download("clingen", "started")
+    progress_cb("[ClinGen] Downloading gene-disease validity assertions...")
+
+    try:
+        path = _fetch(CLINGEN_CSV_URL, "ClinGen", "clingen_validity.csv", progress_cb)
+    except Exception as e:
+        local_db.log_download("clingen", "failed", error=str(e))
+        progress_cb(f"[ClinGen] Download failed: {e}")
+        return 0
+
+    rows_to_insert: list[tuple] = []
+    count = 0
+
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
+            # ClinGen CSV has a few header/comment lines — skip until real header
+            for line in fh:
+                if line.startswith("#") or not line.strip():
+                    continue
+                if "GENE SYMBOL" in line.upper() or "GENE,DISEASE" in line.upper():
+                    break
+
+            reader = csv.DictReader(fh)
+            # Normalise column names
+            for row in reader:
+                cols = {k.strip().upper(): v.strip() for k, v in row.items() if k}
+                gene   = cols.get("GENE SYMBOL") or cols.get("GENE") or ""
+                disease= cols.get("DISEASE LABEL") or cols.get("DISEASE") or cols.get("OMIM DISEASE") or ""
+                mim    = cols.get("DISEASE OMIM ID") or cols.get("OMIM ID") or ""
+                classif= cols.get("CLASSIFICATION") or cols.get("CLINICAL VALIDITY CLASSIFICATION") or ""
+                moi    = cols.get("MOI") or cols.get("INHERITANCE") or ""
+
+                if gene and disease and classif:
+                    rows_to_insert.append((gene, disease, mim, classif, moi))
+                    count += 1
+
+                if len(rows_to_insert) >= 1000:
+                    _clingen_flush(rows_to_insert)
+                    rows_to_insert.clear()
+
+    except Exception as e:
+        local_db.log_download("clingen", "failed", error=str(e))
+        progress_cb(f"[ClinGen] Parse error: {e}")
+        return 0
+
+    if rows_to_insert:
+        _clingen_flush(rows_to_insert)
+
+    local_db.log_download("clingen", "completed", records=count)
+    progress_cb(f"[ClinGen] Done — {count:,} gene-disease validity assertions stored.")
+    return count
+
+
+def _clingen_flush(rows: list[tuple]) -> None:
+    local_db.executemany(
+        """INSERT OR IGNORE INTO clingen_validity
+           (gene_symbol, disease_name, disease_mim, classification, moi)
+           VALUES (?,?,?,?,?)""",
+        rows,
+    )
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description="HealthAgent database downloader")
-    parser.add_argument("--all",      action="store_true", help="Download all sources")
-    parser.add_argument("--gwas",     action="store_true", help="Download GWAS Catalog")
-    parser.add_argument("--clinvar",  action="store_true", help="Download ClinVar")
-    parser.add_argument("--pharmgkb", action="store_true", help="Download PharmGKB")
+    parser.add_argument("--all",         action="store_true", help="Download all sources")
+    parser.add_argument("--gwas",        action="store_true", help="Download GWAS Catalog")
+    parser.add_argument("--clinvar",     action="store_true", help="Download ClinVar")
+    parser.add_argument("--pharmgkb",    action="store_true", help="Download PharmGKB")
     parser.add_argument("--wellness",    action="store_true", help="Seed wellness traits")
     parser.add_argument("--disgenet",    action="store_true", help="Download DisGeNET")
     parser.add_argument("--ensembl",     action="store_true", help="Fetch Ensembl VEP consequences")
     parser.add_argument("--finngen",     action="store_true", help="Download FinnGen R10 associations")
     parser.add_argument("--opentargets", action="store_true", help="Download OpenTargets associations")
+    parser.add_argument("--gnomad",      action="store_true", help="Fetch gnomAD allele frequencies")
+    parser.add_argument("--gtex",        action="store_true", help="Fetch GTEx eQTL data")
+    parser.add_argument("--reactome",    action="store_true", help="Fetch Reactome pathways")
+    parser.add_argument("--uniprot",     action="store_true", help="Fetch UniProt annotations")
+    parser.add_argument("--clingen",     action="store_true", help="Download ClinGen gene validity")
     parser.add_argument("--status",      action="store_true", help="Show DB stats")
     args = parser.parse_args()
 
@@ -1288,27 +1775,30 @@ def main() -> None:
 
     if args.wellness or args.all:
         seed_wellness_traits()
-
     if args.gwas or args.all:
         download_gwas()
-
     if args.clinvar or args.all:
         download_clinvar()
-
     if args.pharmgkb or args.all:
         download_pharmgkb()
-
     if args.disgenet or args.all:
         download_disgenet()
-
     if args.ensembl or args.all:
         download_ensembl_consequences()
-
     if args.finngen or args.all:
         download_finngen()
-
     if args.opentargets or args.all:
         download_opentargets()
+    if args.clingen or args.all:
+        download_clingen()
+    if args.gnomad or args.all:
+        download_gnomad()
+    if args.gtex or args.all:
+        download_gtex()
+    if args.reactome or args.all:
+        download_reactome()
+    if args.uniprot or args.all:
+        download_uniprot()
 
 
 if __name__ == "__main__":

@@ -117,17 +117,31 @@ def analyze_profile(profile: "DNAProfile") -> dict:
         | {r["gene"] for r in snp_gene_rows if r["gene"]}
     )
 
+    # ── Phase 1b: rsid-level new DB queries ──────────────────────
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="ha-rsid2") as pool:
+        f_gnomad  = pool.submit(local_db.get_gnomad_frequencies, rsid_list)
+
+        gnomad_rows = f_gnomad.result()
+
     # ── Phase 2: gene-dependent queries run in parallel ───────────
-    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="ha-gene") as pool:
+    with ThreadPoolExecutor(max_workers=6, thread_name_prefix="ha-gene") as pool:
         f_drugs       = pool.submit(
             lambda: local_db.get_drug_interactions(rsids=rsid_list, genes=genes)
         )
         f_disgenet    = pool.submit(local_db.get_disgenet_diseases, genes, 0.3)
         f_opentargets = pool.submit(local_db.get_opentargets, genes)
+        f_gtex        = pool.submit(local_db.get_gtex_eqtls, genes)
+        f_reactome    = pool.submit(local_db.get_reactome_pathways, genes)
+        f_uniprot     = pool.submit(local_db.get_uniprot_annotations, genes)
+        f_clingen     = pool.submit(local_db.get_clingen_assertions, genes)
 
         drug_rows        = f_drugs.result()
         disgenet_rows    = f_disgenet.result()
         opentargets_rows = f_opentargets.result()
+        gtex_rows        = f_gtex.result()
+        reactome_rows    = f_reactome.result()
+        uniprot_rows     = f_uniprot.result()
+        clingen_rows     = f_clingen.result()
 
     # ── Enrich wellness results ───────────────────────────────────
     wellness = []
@@ -213,6 +227,17 @@ def analyze_profile(profile: "DNAProfile") -> dict:
 
     worth_noting = sum(1 for w in wellness if w.get("risk_level") == "elevated")
 
+    # Build gnomAD lookup map (rsid → frequency dict)
+    gnomad_map = {r["rsid"]: r for r in gnomad_rows}
+
+    # Enrich GWAS rows with population frequencies
+    for row in gwas:
+        freq = gnomad_map.get(row.get("rsid", ""))
+        if freq:
+            row["af_global"] = freq.get("af_global")
+            row["af_nfe"]    = freq.get("af_nfe")
+            row["hom_count"] = freq.get("hom_count")
+
     result = {
         "wellness":    wellness,
         "gwas":        gwas,
@@ -223,6 +248,11 @@ def analyze_profile(profile: "DNAProfile") -> dict:
         "ensembl":     ensembl,
         "biobank":     [dict(r) for r in biobank_rows],
         "tcga":        tcga,
+        "gnomad":      [dict(r) for r in gnomad_rows],
+        "gtex":        [dict(r) for r in gtex_rows],
+        "reactome":    [dict(r) for r in reactome_rows],
+        "uniprot":     [dict(r) for r in uniprot_rows],
+        "clingen":     [dict(r) for r in clingen_rows],
         "summary": {
             "total_snps":      len(rsid_list),
             "traits_found":    len(wellness),
@@ -230,6 +260,11 @@ def analyze_profile(profile: "DNAProfile") -> dict:
             "clinvar_found":   len(clinvar),
             "drugs_found":     len(drugs),
             "tcga_found":      len(tcga),
+            "gnomad_found":    len(gnomad_rows),
+            "gtex_found":      len(gtex_rows),
+            "reactome_found":  len(reactome_rows),
+            "uniprot_found":   len(uniprot_rows),
+            "clingen_found":   len(clingen_rows),
             "worth_noting":    worth_noting,
             "category_counts": cat_counts,
             "db_stats":        local_db.get_db_stats(),

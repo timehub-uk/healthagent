@@ -312,11 +312,103 @@ def get_biobank_phenotypes(rsids: list[str]) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def get_gnomad_frequencies(rsids: list[str]) -> list[dict]:
+    """Return gnomAD population allele frequencies for given rsids."""
+    if not rsids:
+        return []
+    conn = _get_conn()
+    if len(rsids) > _SQLITE_VAR_LIMIT:
+        _load_rsids_temp(conn, rsids)
+        clause, params = "rsid IN (SELECT rsid FROM _profile_rsids)", ()
+    else:
+        ph = ",".join("?" * len(rsids))
+        clause, params = f"rsid IN ({ph})", tuple(rsids)
+    cur = conn.execute(
+        f"""SELECT rsid, af_global, hom_count, ac_global, an_global,
+                   af_afr, af_amr, af_asj, af_eas, af_fin, af_nfe, af_sas
+            FROM gnomad_frequency WHERE {clause}""",
+        params,
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def get_gtex_eqtls(genes: list[str]) -> list[dict]:
+    """Return GTEx eQTL tissue associations for given gene symbols."""
+    if not genes:
+        return []
+    ph = ",".join("?" * len(genes))
+    rows = query(
+        f"""SELECT gene_symbol, tissue, rsid, effect_size, pval, direction
+            FROM gtex_eqtl
+            WHERE gene_symbol IN ({ph}) AND pval < 0.05
+            ORDER BY ABS(effect_size) DESC LIMIT {len(genes) * 10}""",
+        tuple(genes),
+    )
+    return [dict(r) for r in rows]
+
+
+def get_reactome_pathways(genes: list[str]) -> list[dict]:
+    """Return Reactome pathway memberships for given gene symbols."""
+    if not genes:
+        return []
+    ph = ",".join("?" * len(genes))
+    rows = query(
+        f"""SELECT gene_symbol, pathway_id, pathway_name, top_level_pathway
+            FROM reactome_pathway
+            WHERE gene_symbol IN ({ph})
+            ORDER BY gene_symbol, pathway_name LIMIT {len(genes) * 15}""",
+        tuple(genes),
+    )
+    return [dict(r) for r in rows]
+
+
+def get_uniprot_annotations(genes: list[str]) -> list[dict]:
+    """Return UniProt protein function and disease annotations for given genes."""
+    if not genes:
+        return []
+    ph = ",".join("?" * len(genes))
+    rows = query(
+        f"""SELECT gene_symbol, uniprot_id, protein_name, function_text,
+                   disease_name, disease_mim
+            FROM uniprot_annotation
+            WHERE gene_symbol IN ({ph})
+            ORDER BY gene_symbol LIMIT {len(genes) * 8}""",
+        tuple(genes),
+    )
+    return [dict(r) for r in rows]
+
+
+def get_clingen_assertions(genes: list[str]) -> list[dict]:
+    """Return ClinGen gene-disease validity assertions for given genes."""
+    if not genes:
+        return []
+    ph = ",".join("?" * len(genes))
+    rows = query(
+        f"""SELECT gene_symbol, disease_name, disease_mim, classification, moi
+            FROM clingen_validity
+            WHERE gene_symbol IN ({ph})
+            ORDER BY
+                CASE classification
+                    WHEN 'Definitive' THEN 1
+                    WHEN 'Strong' THEN 2
+                    WHEN 'Moderate' THEN 3
+                    WHEN 'Limited' THEN 4
+                    WHEN 'Disputed' THEN 5
+                    WHEN 'Refuted' THEN 6
+                    ELSE 7
+                END""",
+        tuple(genes),
+    )
+    return [dict(r) for r in rows]
+
+
 def get_db_stats() -> dict:
     """Return row counts per table for status reporting."""
     tables = ["snp", "gwas_association", "clinvar_variant", "drug_interaction",
               "wellness_trait", "disgenet_association", "opentargets_association",
-              "ensembl_consequence", "biobank_phenotype", "download_log"]
+              "ensembl_consequence", "biobank_phenotype", "download_log",
+              "gnomad_frequency", "gtex_eqtl", "reactome_pathway",
+              "uniprot_annotation", "clingen_validity"]
     stats = {}
     for t in tables:
         try:

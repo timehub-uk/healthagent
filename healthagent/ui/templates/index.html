@@ -68,21 +68,15 @@ body {
   z-index: 100;
   box-shadow: 0 2px 24px rgba(0,0,0,0.5);
 }
-/* ECG pulse line behind header */
-#site-header::before {
-  content: '';
+/* ECG heartbeat canvas strip at bottom of header */
+#ecg-canvas {
   position: absolute;
   bottom: 0;
-  left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent 0%, #0ea5e9 40%, #38bdf8 60%, transparent 100%);
-  animation: ecg-sweep 3s linear infinite;
-  opacity: 0.6;
-}
-@keyframes ecg-sweep {
-  0%   { background-position: -100% 0; transform: scaleX(0) translateX(-100%); }
-  50%  { transform: scaleX(1) translateX(0); }
-  100% { transform: scaleX(0) translateX(100%); }
+  left: 0;
+  width: 100%;
+  height: 32px;
+  pointer-events: none;
+  opacity: 0.55;
 }
 .header-logo {
   font-size: 1.5rem;
@@ -1000,7 +994,204 @@ body {
 .card-source-pill.src-clinvar   { color: #f87171; border-color: #f8717140; background: #f8717110; }
 .card-source-pill.src-pharmgkb  { color: #c084fc; border-color: #c084fc40; background: #c084fc10; }
 .card-source-pill.src-tcga      { color: #fb923c; border-color: #fb923c40; background: #fb923c10; }
+.card-source-pill.src-gnomad    { color: #22d3ee; border-color: #22d3ee40; background: #22d3ee10; }
+.card-source-pill.src-clingen   { color: #86efac; border-color: #86efac40; background: #86efac10; }
+.card-source-pill.src-uniprot   { color: #fbbf24; border-color: #fbbf2440; background: #fbbf2410; }
+.card-source-pill.src-gtex      { color: #f0abfc; border-color: #f0abfc40; background: #f0abfc10; }
+.card-source-pill.src-reactome  { color: #6ee7b7; border-color: #6ee7b740; background: #6ee7b710; }
 .card-source-pill.src-other     { color: #94a3b8; border-color: #94a3b840; background: #94a3b810; }
+
+/* ═══════════════════════════════════════════════════════
+   DNA REF BAR
+═══════════════════════════════════════════════════════ */
+#dna-ref-bar {
+  background: rgba(14,165,233,0.06);
+  border-bottom: 1px solid rgba(14,165,233,0.18);
+  padding: 0.35rem 1.5rem;
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.73rem;
+  color: var(--muted);
+}
+#dna-ref-bar.visible { display: flex; }
+#dna-ref-bar .dna-ref-label { color: var(--muted); letter-spacing: 0.04em; }
+#dna-ref-bar .dna-ref-id {
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+  color: var(--accent1);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: rgba(14,165,233,0.08);
+  padding: 0.1rem 0.55rem;
+  border-radius: 5px;
+  border: 1px solid rgba(14,165,233,0.25);
+}
+#dna-ref-bar .dna-ref-note { margin-left: auto; font-size: 0.65rem; color: var(--muted); }
+
+/* ═══════════════════════════════════════════════════════
+   CARD STRUCTURED SECTIONS (what / why / when / how)
+═══════════════════════════════════════════════════════ */
+.card-sections { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.1rem; }
+.card-section { border-radius: 8px; overflow: hidden; }
+.card-section-hdr {
+  font-size: 0.63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.25rem 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.card-section-body {
+  font-size: 0.83rem;
+  color: var(--muted2);
+  line-height: 1.6;
+  padding: 0.4rem 0.65rem 0.5rem;
+}
+.cs-what  { background: rgba(14,165,233,0.06); border: 1px solid rgba(14,165,233,0.15); }
+.cs-what  .card-section-hdr { color: #38bdf8; background: rgba(14,165,233,0.08); }
+.cs-why   { background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.15); }
+.cs-why   .card-section-hdr { color: #a78bfa; background: rgba(139,92,246,0.08); }
+.cs-when  { background: rgba(245,158,11,0.05); border: 1px solid rgba(245,158,11,0.15); }
+.cs-when  .card-section-hdr { color: #fbbf24; background: rgba(245,158,11,0.08); }
+.cs-how   { background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.15); }
+.cs-how   .card-section-hdr { color: #34d399; background: rgba(16,185,129,0.08); }
+.card-see-more {
+  font-size: 0.75rem;
+  color: var(--accent1);
+  cursor: pointer;
+  font-weight: 500;
+  padding: 0.35rem 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: color 0.15s;
+  margin-top: 0.2rem;
+}
+.card-see-more:hover { color: var(--accent2); }
+
+/* ═══════════════════════════════════════════════════════
+   CARD DETAIL MODAL
+═══════════════════════════════════════════════════════ */
+#card-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3,7,18,0.85);
+  z-index: 9000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(6px);
+}
+#card-modal-overlay.open { display: flex; }
+#card-modal {
+  background: #0d1f38;
+  border: 1px solid rgba(14,165,233,0.25);
+  border-radius: 18px;
+  max-width: 680px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(14,165,233,0.1);
+  display: flex;
+  flex-direction: column;
+}
+#card-modal-header {
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+#card-modal-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+#card-modal-title { font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
+#card-modal-meta  { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
+#card-modal-close {
+  margin-left: auto;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.9rem;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+#card-modal-close:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+#card-modal-body { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.modal-section { display: flex; flex-direction: column; gap: 0.4rem; }
+.modal-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent1);
+}
+.modal-section-text { font-size: 0.9rem; color: var(--muted2); line-height: 1.7; }
+.modal-ext-section {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+.modal-ext-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+.modal-ext-text  { font-size: 0.85rem; color: var(--muted2); line-height: 1.65; }
+.modal-ext-link  { font-size: 0.8rem; color: var(--accent1); margin-top: 0.5rem; display: block; }
+.modal-freq-row  { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.3rem; }
+.modal-freq-chip {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  color: var(--muted2);
+  font-family: monospace;
+}
+.modal-freq-chip strong { color: var(--text); }
+#card-modal-footer {
+  padding: 0.85rem 1.5rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.modal-loading { color: var(--muted); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; animation: pulse 1.5s infinite; }
+
+/* ═══════════════════════════════════════════════════════
+   REPORT BUTTON
+═══════════════════════════════════════════════════════ */
+#report-btn {
+  display: none;
+  background: linear-gradient(135deg, #0f4c7a, #0c2a4a);
+  border: 1px solid rgba(14,165,233,0.35);
+  color: #7dd3fc;
+  padding: 0.4rem 0.9rem;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  gap: 0.4rem;
+  display: none;
+  align-items: center;
+}
+#report-btn.visible { display: inline-flex; }
+#report-btn:hover { background: linear-gradient(135deg, #1560a0, #0f3d6b); border-color: var(--accent1); }
 
 /* ══════════════════════════════════════════════════════════════
    DB STATUS BAR
@@ -1865,7 +2056,16 @@ body {
     <button class="btn-primary" onclick="document.getElementById('file-input').click()">⬆ Upload DNA</button>
     <input type="file" id="file-input" accept=".txt,.csv,.tsv,.vcf" onchange="uploadFile(this)">
   </div>
+  <!-- ECG heartbeat strip -->
+  <canvas id="ecg-canvas"></canvas>
 </header>
+
+<!-- DNA Reference bar — shown once a profile is loaded -->
+<div id="dna-ref-bar">
+  <span class="dna-ref-label">🧬 GENOME REF</span>
+  <span class="dna-ref-id" id="dna-ref-val">—</span>
+  <span class="dna-ref-note">Your private genomic reference identifier · never shared</span>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════
      HERO
@@ -1873,8 +2073,8 @@ body {
 <section id="hero">
   <canvas id="mini-helix"></canvas>
   <div class="hero-content">
-    <div class="hero-title">Discover what your DNA says about you</div>
-    <div class="hero-sub">Upload your 23andMe or AncestryDNA file to unlock personalized wellness insights</div>
+    <div class="hero-title" id="hero-title-text">Discover what your DNA says about you</div>
+    <div class="hero-sub" id="hero-sub-text">Upload your 23andMe or AncestryDNA file to unlock personalized wellness insights</div>
     <div class="hero-count hidden" id="hero-count">
       <span>✨</span>
       <span><span id="insight-count">0</span> wellness insights found</span>
@@ -2007,6 +2207,12 @@ body {
     <button class="src-pill"        data-src="opentargets"  onclick="TraitUI.filterSource('opentargets',this)">🎯 OpenTargets <span class="src-count" id="src-count-opentargets">—</span><span class="src-progress"></span></button>
     <button class="src-pill"        data-src="finngen"      onclick="TraitUI.filterSource('finngen',this)">🏥 FinnGen <span class="src-count" id="src-count-finngen">—</span><span class="src-progress"></span></button>
     <button class="src-pill"        data-src="tcga"         onclick="TraitUI.filterSource('tcga',this)">🔭 TCGA <span class="src-count" id="src-count-tcga">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="gnomad"       onclick="TraitUI.filterSource('gnomad',this)">🌍 gnomAD <span class="src-count" id="src-count-gnomad">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="gtex"         onclick="TraitUI.filterSource('gtex',this)">📊 GTEx <span class="src-count" id="src-count-gtex">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="reactome"     onclick="TraitUI.filterSource('reactome',this)">🔄 Reactome <span class="src-count" id="src-count-reactome">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="uniprot"      onclick="TraitUI.filterSource('uniprot',this)">🧪 UniProt <span class="src-count" id="src-count-uniprot">—</span><span class="src-progress"></span></button>
+    <button class="src-pill"        data-src="clingen"      onclick="TraitUI.filterSource('clingen',this)">✅ ClinGen <span class="src-count" id="src-count-clingen">—</span><span class="src-progress"></span></button>
+    <button id="report-btn" onclick="generatePDFReport()" title="Generate clinical PDF report">📄 Generate Report</button>
   </div>
 
   <!-- main content (empty-state + trait grid) -->
@@ -2463,6 +2669,11 @@ const TraitUI = {
         ...tag(data.ensembl,     'ensembl'),
         ...tag(data.biobank,     'finngen'),
         ...tag(data.tcga,        'tcga'),
+        // New databases
+        ...tag((data.clingen  || []).map(r => ({...r, trait_name: r.disease_name || r.gene_symbol, your_result: r.classification, detail: `Mode of inheritance: ${r.moi || 'unknown'}`, category: 'clingen'})), 'clingen'),
+        ...tag((data.uniprot  || []).filter(r => r.disease_name).map(r => ({...r, trait_name: r.disease_name || r.protein_name, your_result: r.function_text ? r.function_text.slice(0,100)+'…' : 'Protein disease annotation', detail: r.function_text || '', category: 'uniprot'})), 'uniprot'),
+        ...tag((data.gtex     || []).map(r => ({...r, trait_name: `${r.gene_symbol} expression in ${(r.tissue||'').replace(/_/g,' ')}`, your_result: `Effect size: ${r.effect_size >= 0 ? '+' : ''}${(r.effect_size||0).toFixed(3)}`, detail: `This variant affects gene expression in ${(r.tissue||'').replace(/_/g,' ')} (p=${r.pval?.toExponential(2)})`, category: 'gtex'})), 'gtex'),
+        ...tag((data.reactome || []).map(r => ({...r, trait_name: r.pathway_name, your_result: `${r.gene_symbol} is involved in this pathway`, detail: r.top_level_pathway ? `Top-level: ${r.top_level_pathway}` : '', category: 'reactome'})), 'reactome'),
       ];
       this.render();
       this.updateHeroCount(this.allTraits.length);
@@ -2522,15 +2733,20 @@ const TraitUI = {
     const dl   = {};  // download progress if available (populated by _dl_progress polling)
 
     const SRC_DB_MAP = {
-      wellness:     db.wellness_trait       || 0,
-      gwas:         db.gwas_association     || 0,
-      clinvar:      db.clinvar_variant      || 0,
-      drugs:        db.drug_interaction     || 0,
-      ensembl:      db.ensembl_consequence  || 0,
-      disgenet:     db.disgenet_association || 0,
-      opentargets:  db.opentargets_association || 0,
-      finngen:      db.biobank_phenotype    || 0,
-      tcga:         (data.tcga || []).length || 0,
+      wellness:    db.wellness_trait            || 0,
+      gwas:        db.gwas_association          || 0,
+      clinvar:     db.clinvar_variant           || 0,
+      drugs:       db.drug_interaction          || 0,
+      ensembl:     db.ensembl_consequence       || 0,
+      disgenet:    db.disgenet_association      || 0,
+      opentargets: db.opentargets_association   || 0,
+      finngen:     db.biobank_phenotype         || 0,
+      tcga:        (data.tcga || []).length     || 0,
+      gnomad:      db.gnomad_frequency          || 0,
+      gtex:        db.gtex_eqtl                 || 0,
+      reactome:    db.reactome_pathway          || 0,
+      uniprot:     db.uniprot_annotation        || 0,
+      clingen:     db.clingen_validity          || 0,
     };
 
     // Count matched traits per source
@@ -2648,6 +2864,17 @@ const TraitUI = {
     // Detail id — fall back to a random key when rsid absent (GWAS rows may lack unique rsid)
     const detailId = safeId(trait.rsid || trait.trait_name || Math.random().toString(36).slice(2));
 
+    // Encode trait data for modal (safe JSON in data attribute)
+    const traitJson = encodeURIComponent(JSON.stringify(trait));
+    card.setAttribute('data-trait', traitJson);
+    card.style.cursor = 'pointer';
+    card.title = 'Click for detailed information';
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('.expand-toggle') && !e.target.closest('.card-see-more')) {
+        openCardModal(trait);
+      }
+    });
+
     card.innerHTML = `
       <div class="trait-card-inner">
 
@@ -2664,26 +2891,34 @@ const TraitUI = {
           ${riskLabel ? `<span class="risk-badge" style="color:${riskColor};background:${riskBg};border:1px solid ${riskColor}33;">${escHtml(riskLabel)}</span>` : ''}
         </div>
 
-        <!-- ② Finding box: the personal result, coloured by risk level -->
-        ${trait.your_result ? `
-        <div class="card-finding">
-          <div class="card-finding-label">What this means for you</div>
-          <div class="card-result">${escHtml(trait.your_result)}</div>
-        </div>` : ''}
+        <!-- ② Structured what/why/when/how sections -->
+        <div class="card-sections">
+          ${trait.your_result ? `
+          <div class="card-section cs-what">
+            <div class="card-section-hdr">⚡ What</div>
+            <div class="card-section-body">${escHtml(trait.your_result)}</div>
+          </div>` : ''}
 
-        <!-- ③ Background detail: collapsed by default -->
-        ${trait.detail ? `
-        <div>
-          <div class="card-detail" id="detail-${detailId}">${escHtml(trait.detail)}</div>
-          <span class="expand-toggle" onclick="toggleDetail('${detailId}', this)">Why? Show more ↓</span>
-        </div>` : ''}
+          ${trait.detail ? `
+          <div class="card-section cs-why">
+            <div class="card-section-hdr">🔬 Why</div>
+            <div class="card-section-body">${escHtml(trait.detail.length > 160 ? trait.detail.slice(0,160) + '…' : trait.detail)}</div>
+          </div>` : ''}
 
-        <!-- ④ Action advice -->
-        ${trait.what_to_do ? `
-        <div class="card-action">
-          <div class="card-action-header">💡 What you can do</div>
-          <div class="card-action-text">${escHtml(trait.what_to_do)}</div>
-        </div>` : ''}
+          ${trait.why_it_matters ? `
+          <div class="card-section cs-when">
+            <div class="card-section-hdr">⏱ When it matters</div>
+            <div class="card-section-body">${escHtml(trait.why_it_matters.length > 130 ? trait.why_it_matters.slice(0,130)+'…' : trait.why_it_matters)}</div>
+          </div>` : ''}
+
+          ${trait.what_to_do ? `
+          <div class="card-section cs-how">
+            <div class="card-section-hdr">💡 How to act</div>
+            <div class="card-section-body">${escHtml(trait.what_to_do.length > 130 ? trait.what_to_do.slice(0,130)+'…' : trait.what_to_do)}</div>
+          </div>` : ''}
+        </div>
+
+        <span class="card-see-more">🔍 Full details &amp; research →</span>
 
       </div>
 
@@ -2698,20 +2933,25 @@ const TraitUI = {
   },
 
   _sourcePill(trait) {
-    const cat = (trait.category || '').toLowerCase();
+    const cat = (trait._source || trait.category || '').toLowerCase();
     const SOURCE_MAP = {
-      'wellness':    ['src-curated',  'Curated'],
-      'nutrition':   ['src-curated',  'Curated'],
-      'fitness':     ['src-curated',  'Curated'],
-      'sleep':       ['src-curated',  'Curated'],
-      'allergies':   ['src-curated',  'Curated'],
-      'supplements': ['src-curated',  'Curated'],
-      'health_history': ['src-curated', 'Curated'],
-      'traits':      ['src-curated',  'Curated'],
-      'gwas':        ['src-gwas',     'GWAS Catalog'],
-      'clinvar':     ['src-clinvar',  'ClinVar'],
-      'medications': ['src-pharmgkb', 'PharmGKB'],
-      'tcga':        ['src-tcga',     'TCGA'],
+      'wellness':       ['src-curated',  'Curated'],
+      'nutrition':      ['src-curated',  'Curated'],
+      'fitness':        ['src-curated',  'Curated'],
+      'sleep':          ['src-curated',  'Curated'],
+      'allergies':      ['src-curated',  'Curated'],
+      'supplements':    ['src-curated',  'Curated'],
+      'health_history': ['src-curated',  'Curated'],
+      'traits':         ['src-curated',  'Curated'],
+      'gwas':           ['src-gwas',     'GWAS Catalog'],
+      'clinvar':        ['src-clinvar',  'ClinVar'],
+      'medications':    ['src-pharmgkb', 'PharmGKB'],
+      'tcga':           ['src-tcga',     'TCGA'],
+      'gnomad':         ['src-gnomad',   'gnomAD'],
+      'gtex':           ['src-gtex',     'GTEx'],
+      'reactome':       ['src-reactome', 'Reactome'],
+      'uniprot':        ['src-uniprot',  'UniProt'],
+      'clingen':        ['src-clingen',  'ClinGen'],
     };
     const [cls, label] = SOURCE_MAP[cat] || ['src-other', 'Other'];
     return `<span class="card-source-pill ${cls}">${label}</span>`;
@@ -3027,9 +3267,17 @@ function _revealApp() {
   const footer = document.getElementById('db-status-footer');
   if (footer) footer.style.display = '';
   DBFooter.load();
-  // Show clear-data button
+  // Show clear-data button and report button
   const cb = document.getElementById('clear-data-btn');
   if (cb) cb.style.display = '';
+  const rb = document.getElementById('report-btn');
+  if (rb) rb.classList.add('visible');
+  // Show DNA ref bar
+  const refBar = document.getElementById('dna-ref-bar');
+  if (refBar) refBar.classList.add('visible');
+  // Hide hero sub-text (upload prompt) once data is loaded
+  const heroSub = document.getElementById('hero-sub-text');
+  if (heroSub) heroSub.style.display = 'none';
 }
 
 async function afterLoad(info) {
@@ -3051,13 +3299,16 @@ async function afterLoad(info) {
   const scanBtn = document.getElementById('chrom-scan-btn');
   if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '🔬 Scan chromosomes'; }
 
-  // Show Genome UID in hero bar and header
+  // Show Genome UID in DNA ref bar, hero bar, and header
   if (info.genome_uid) {
-    const heroCount = document.getElementById('hero-count');
-    if (heroCount) {
-      heroCount.classList.remove('hidden');
-      heroCount.innerHTML = `<span>🧬</span><span style="font-family:monospace;letter-spacing:0.04em">${_esc(info.genome_uid)}</span>`;
-    }
+    // Top DNA ref bar
+    const refVal = document.getElementById('dna-ref-val');
+    if (refVal) refVal.textContent = info.genome_uid;
+
+    // Hero title — replace title text with just the ref ID
+    const heroTitle = document.getElementById('hero-title-text');
+    if (heroTitle) heroTitle.textContent = info.genome_uid;
+
     // Also stamp the UID on the medical badge
     const badge = document.querySelector('.header-medical-badge');
     if (badge) badge.title = `Genome UID: ${info.genome_uid}`;
@@ -3184,6 +3435,11 @@ const _DL_SRC_MAP = {
   disgenet:    'disgenet',
   opentargets: 'opentargets',
   finngen:     'finngen',
+  clingen:     'clingen',
+  gnomad:      'gnomad',
+  gtex:        'gtex',
+  reactome:    'reactome',
+  uniprot:     'uniprot',
 };
 
 function _updateSourcePillsFromProgress(prog) {
@@ -4113,6 +4369,103 @@ function drawMiniHelix(canvas, theta) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  ECG Heartbeat Strip (header canvas)
+// ═══════════════════════════════════════════════════════════════════
+(function initECG() {
+  const canvas = document.getElementById('ecg-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // ECG waveform: flat baseline → P wave → QRS complex → T wave
+  // Normalised x:0-1, y: 0 = baseline (mid), positive = up
+  const WAVE = [
+    [0,    0],
+    [0.10, 0],      // flat
+    [0.14, 0.06],   // P wave start
+    [0.18, 0.14],   // P wave peak
+    [0.22, 0.06],   // P wave end
+    [0.26, 0],      // back to baseline
+    [0.34, 0],      // PR segment
+    [0.37,-0.08],   // Q dip
+    [0.40, 1.00],   // R spike (tallest point)
+    [0.43,-0.12],   // S dip
+    [0.48, 0],      // baseline
+    [0.54, 0],      // ST segment
+    [0.58, 0.08],   // T wave start
+    [0.65, 0.22],   // T wave peak
+    [0.72, 0.08],   // T wave end
+    [0.76, 0],      // back to baseline
+    [1.00, 0],      // flat
+  ];
+
+  // Build interpolated polyline (200 points)
+  function buildPoints(w, h) {
+    const amp = h * 0.72;   // spike height
+    const mid = h * 0.55;   // baseline y position
+    const pts = [];
+    for (let i = 0; i < WAVE.length - 1; i++) {
+      const [x0, y0] = WAVE[i], [x1, y1] = WAVE[i+1];
+      const steps = Math.max(1, Math.round((x1 - x0) * 120));
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        pts.push([
+          (x0 + (x1 - x0) * t) * w,
+          mid - (y0 + (y1 - y0) * t) * amp
+        ]);
+      }
+    }
+    pts.push([w, mid]);
+    return pts;
+  }
+
+  let offset = 0;
+  let pts = [];
+  const SPEED = 0.6;  // px per frame
+
+  function resize() {
+    canvas.width  = canvas.offsetWidth  || window.innerWidth;
+    canvas.height = canvas.offsetHeight || 32;
+    pts = buildPoints(canvas.width * 2, canvas.height);  // 2× wide for seamless loop
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function drawECG() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // Fading tail glow
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0,   'transparent');
+    grad.addColorStop(0.5, '#0ea5e980');
+    grad.addColorStop(0.85,'#38bdf8ff');
+    grad.addColorStop(1,   'transparent');
+
+    ctx.strokeStyle = grad;
+    ctx.lineWidth   = 1.5;
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur  = 6;
+    ctx.beginPath();
+
+    let started = false;
+    const segW = pts.length > 0 ? (pts[pts.length-1][0] - pts[0][0]) / 2 : W;
+    for (let i = 0; i < pts.length; i++) {
+      const px = pts[i][0] - (offset % segW);
+      if (px < -2 || px > W + 2) continue;
+      if (!started) { ctx.moveTo(px, pts[i][1]); started = true; }
+      else ctx.lineTo(px, pts[i][1]);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    offset += SPEED;
+    if (offset > segW) offset -= segW;
+    requestAnimationFrame(drawECG);
+  }
+  drawECG();
+})();
+
+// ═══════════════════════════════════════════════════════════════════
 //  Animation loop
 // ═══════════════════════════════════════════════════════════════════
 const helixCanvas  = document.getElementById('helix-canvas');
@@ -4940,6 +5293,345 @@ const UserIdentity = (() => {
   return { getOrCreate, storeEncrypted, loadEncrypted, encryptJSON, decryptJSON };
 })();
 
+// ═══════════════════════════════════════════════════════════════════
+//  CARD DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════════
+function openCardModal(trait) {
+  const overlay = document.getElementById('card-modal-overlay');
+  const icon    = document.getElementById('card-modal-icon');
+  const title   = document.getElementById('card-modal-title');
+  const meta    = document.getElementById('card-modal-meta');
+  const body    = document.getElementById('card-modal-body');
+  const srcPill = document.getElementById('card-modal-source-pill');
+  const geneEl  = document.getElementById('card-modal-gene');
+  const rsidEl  = document.getElementById('card-modal-rsid');
+
+  // Header
+  const cat     = TraitUI._catMeta(trait);
+  icon.textContent    = trait.icon || cat.label.split(' ')[0] || '🧬';
+  icon.style.background = cat.bg || 'rgba(14,165,233,0.12)';
+  icon.style.border   = `1px solid ${cat.color || '#0ea5e9'}33`;
+  title.textContent   = trait.trait_name || 'Trait';
+  meta.textContent    = [trait.gene, trait.rsid, trait.category_label].filter(Boolean).join(' · ');
+  geneEl.textContent  = trait.gene  ? `Gene: ${trait.gene}` : '';
+  rsidEl.textContent  = trait.rsid  ? trait.rsid : '';
+  srcPill.className   = `card-source-pill ${TraitUI._sourceCls(trait)}`;
+  srcPill.textContent = TraitUI._sourceLabel(trait);
+
+  // Body — internal data
+  body.innerHTML = `
+    <div class="modal-section">
+      <div class="modal-section-label">⚡ What this means</div>
+      <div class="modal-section-text">${_esc(trait.your_result || '—')}</div>
+    </div>
+    ${trait.detail ? `<div class="modal-section">
+      <div class="modal-section-label">🔬 Why — the science</div>
+      <div class="modal-section-text">${_esc(trait.detail)}</div>
+    </div>` : ''}
+    ${trait.why_it_matters ? `<div class="modal-section">
+      <div class="modal-section-label">⏱ When it matters</div>
+      <div class="modal-section-text">${_esc(trait.why_it_matters)}</div>
+    </div>` : ''}
+    ${trait.what_to_do ? `<div class="modal-section">
+      <div class="modal-section-label">💡 How to act</div>
+      <div class="modal-section-text">${_esc(trait.what_to_do)}</div>
+    </div>` : ''}
+    ${trait.af_global != null ? `<div class="modal-ext-section">
+      <div class="modal-ext-label">🌍 Population Frequency (gnomAD)</div>
+      <div class="modal-freq-row">
+        <span class="modal-freq-chip"><strong>Global</strong> ${(trait.af_global*100).toFixed(3)}%</span>
+        ${trait.af_nfe != null ? `<span class="modal-freq-chip"><strong>European</strong> ${(trait.af_nfe*100).toFixed(3)}%</span>` : ''}
+        ${trait.af_afr != null ? `<span class="modal-freq-chip"><strong>African</strong> ${(trait.af_afr*100).toFixed(3)}%</span>` : ''}
+        ${trait.af_eas != null ? `<span class="modal-freq-chip"><strong>East Asian</strong> ${(trait.af_eas*100).toFixed(3)}%</span>` : ''}
+        ${trait.af_sas != null ? `<span class="modal-freq-chip"><strong>South Asian</strong> ${(trait.af_sas*100).toFixed(3)}%</span>` : ''}
+      </div>
+    </div>` : ''}
+    <div id="modal-ext-loading" class="modal-ext-section">
+      <div class="modal-loading">⏳ Loading external references…</div>
+    </div>
+  `;
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Async: fetch external info
+  _fetchModalExternal(trait);
+}
+
+function closeCardModal() {
+  document.getElementById('card-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function _fetchModalExternal(trait) {
+  const loadingEl = document.getElementById('modal-ext-loading');
+  if (!loadingEl) return;
+
+  const searchTerm = (trait.trait_name || trait.gene || '').split(' ').slice(0,3).join(' ');
+  if (!searchTerm) { loadingEl.remove(); return; }
+
+  let html = '';
+  try {
+    // Wikipedia summary
+    const wikiTerm = encodeURIComponent(searchTerm);
+    const wikiResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${wikiTerm}`, {signal: AbortSignal.timeout(6000)});
+    if (wikiResp.ok) {
+      const wikiData = await wikiResp.json();
+      if (wikiData.extract && wikiData.type !== 'disambiguation') {
+        html += `<div class="modal-ext-section" style="margin-top:0.5rem">
+          <div class="modal-ext-label">📖 Wikipedia</div>
+          <div class="modal-ext-text">${_esc(wikiData.extract.slice(0, 400))}${wikiData.extract.length > 400 ? '…' : ''}</div>
+          <a class="modal-ext-link" href="${_esc(wikiData.content_urls?.desktop?.page || '')}" target="_blank" rel="noopener">Read full article →</a>
+        </div>`;
+      }
+    }
+  } catch(_) {}
+
+  try {
+    // MedlinePlus Connect
+    const mlTerm = encodeURIComponent(searchTerm);
+    const mlResp = await fetch(`https://connect.nlm.nih.gov/service/v1/nlm/search?mainSearchCriteria.v.cs=2.16.840.1.113883.6.177&mainSearchCriteria.v.c=&mainSearchCriteria.v.dn=${mlTerm}&knowledgeResponseType=application/json&informationRecipient.languageCode.c=en`, {signal: AbortSignal.timeout(6000)});
+    if (mlResp.ok) {
+      const mlData = await mlResp.json();
+      const infoItems = mlData?.feed?.entry?.[0];
+      if (infoItems) {
+        const title = infoItems.title?.['_value'] || '';
+        const summary = infoItems.summary?.['_value'] || '';
+        if (summary) {
+          html += `<div class="modal-ext-section" style="margin-top:0.5rem">
+            <div class="modal-ext-label">🏥 MedlinePlus (NIH)</div>
+            <div class="modal-ext-text">${_esc((summary || '').replace(/<[^>]*>/g,'').slice(0,350))}…</div>
+          </div>`;
+        }
+      }
+    }
+  } catch(_) {}
+
+  if (loadingEl) {
+    if (html) {
+      loadingEl.outerHTML = html;
+    } else {
+      loadingEl.innerHTML = `<div class="modal-ext-label">ℹ️ External reference</div>
+        <div class="modal-ext-text" style="font-size:0.8rem;color:var(--muted)">Search for <em>${_esc(searchTerm)}</em> on
+          <a href="https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(searchTerm)}" target="_blank" rel="noopener" style="color:var(--accent1)">Wikipedia</a> ·
+          <a href="https://medlineplus.gov/genetics/gene/${encodeURIComponent(trait.gene||searchTerm)}/" target="_blank" rel="noopener" style="color:var(--accent1)">MedlinePlus</a> ·
+          <a href="https://www.ncbi.nlm.nih.gov/snp/${encodeURIComponent(trait.rsid||'')}" target="_blank" rel="noopener" style="color:var(--accent1)">dbSNP</a>
+        </div>`;
+    }
+  }
+}
+
+// Keyboard close
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCardModal();
+});
+
+// Add helpers to TraitUI used above
+TraitUI._catMeta = function(trait) {
+  const CAT_MAP = {
+    wellness:    {color:'#22c55e',bg:'rgba(34,197,94,0.1)'},
+    nutrition:   {color:'#22c55e',bg:'rgba(34,197,94,0.1)'},
+    fitness:     {color:'#3b82f6',bg:'rgba(59,130,246,0.1)'},
+    sleep:       {color:'#8b5cf6',bg:'rgba(139,92,246,0.1)'},
+    allergies:   {color:'#f59e0b',bg:'rgba(245,158,11,0.1)'},
+    supplements: {color:'#06b6d4',bg:'rgba(6,182,212,0.1)'},
+    health_history:{color:'#f43f5e',bg:'rgba(244,63,94,0.1)'},
+    gwas:        {color:'#60a5fa',bg:'rgba(96,165,250,0.1)'},
+    clinvar:     {color:'#f87171',bg:'rgba(248,113,113,0.1)'},
+    medications: {color:'#c084fc',bg:'rgba(192,132,252,0.1)'},
+    clingen:     {color:'#86efac',bg:'rgba(134,239,172,0.1)'},
+    uniprot:     {color:'#fbbf24',bg:'rgba(251,191,36,0.1)'},
+    gtex:        {color:'#f0abfc',bg:'rgba(240,171,252,0.1)'},
+    reactome:    {color:'#6ee7b7',bg:'rgba(110,231,183,0.1)'},
+  };
+  const cat = (trait._source || trait.category || '').toLowerCase();
+  return CAT_MAP[cat] || {color:'#6366f1',bg:'rgba(99,102,241,0.1)',label:'Other'};
+};
+TraitUI._sourceCls = function(trait) {
+  const cat = (trait._source || trait.category || '').toLowerCase();
+  const M = {wellness:'src-curated',nutrition:'src-curated',fitness:'src-curated',sleep:'src-curated',allergies:'src-curated',supplements:'src-curated',health_history:'src-curated',traits:'src-curated',gwas:'src-gwas',clinvar:'src-clinvar',medications:'src-pharmgkb',tcga:'src-tcga',gnomad:'src-gnomad',clingen:'src-clingen',uniprot:'src-uniprot',gtex:'src-gtex',reactome:'src-reactome'};
+  return M[cat] || 'src-other';
+};
+TraitUI._sourceLabel = function(trait) {
+  const cat = (trait._source || trait.category || '').toLowerCase();
+  const M = {wellness:'Curated',nutrition:'Curated',fitness:'Curated',sleep:'Curated',allergies:'Curated',supplements:'Curated',health_history:'Curated',traits:'Curated',gwas:'GWAS Catalog',clinvar:'ClinVar',medications:'PharmGKB',tcga:'TCGA',gnomad:'gnomAD',clingen:'ClinGen',uniprot:'UniProt',gtex:'GTEx',reactome:'Reactome'};
+  return M[cat] || 'Other';
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  PDF REPORT GENERATOR
+// ═══════════════════════════════════════════════════════════════════
+async function generatePDFReport() {
+  const btn = document.getElementById('report-btn');
+  if (btn) { btn.textContent = '⏳ Generating…'; btn.disabled = true; }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) throw new Error('jsPDF not loaded');
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210, pageH = 297, margin = 14;
+
+    // ── Page 1: Title & Summary ────────────────────────────────
+    // Header bar
+    doc.setFillColor(7, 15, 29);
+    doc.rect(0, 0, pageW, 28, 'F');
+
+    doc.setFontSize(18);
+    doc.setTextColor(14, 165, 233);
+    doc.setFont('helvetica', 'bold');
+    doc.text('HealthAgent Genomic Report', margin, 13);
+
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    const dnaRef = document.getElementById('dna-ref-val')?.textContent || '—';
+    doc.text(`Genome Ref: ${dnaRef}   ·   Generated: ${new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'})}   ·   FOR RESEARCH PURPOSES ONLY`, margin, 21);
+
+    // Summary boxes
+    const traits = TraitUI.allTraits || [];
+    const elevated = traits.filter(t => t.risk_level === 'elevated' || t.clinical_sig === 'Pathogenic');
+    const noted    = traits.filter(t => t.risk_level === 'variant');
+    const drugs    = traits.filter(t => t._source === 'drugs' || t.category === 'medications');
+
+    const boxes = [
+      { label: 'Total Findings', value: traits.length, color: [14,165,233] },
+      { label: 'Worth Noting',   value: elevated.length, color: [239,68,68] },
+      { label: 'Variant',        value: noted.length,    color: [245,158,11] },
+      { label: 'Drug Interactions', value: drugs.length, color: [192,132,252] },
+    ];
+    boxes.forEach((b, i) => {
+      const x = margin + i * 44;
+      doc.setFillColor(...b.color, 20);
+      doc.roundedRect(x, 32, 40, 16, 2, 2, 'F');
+      doc.setDrawColor(...b.color);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(x, 32, 40, 16, 2, 2, 'S');
+      doc.setFontSize(14);
+      doc.setTextColor(...b.color);
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(b.value), x + 20, 41, { align: 'center' });
+      doc.setFontSize(6.5);
+      doc.setTextColor(148, 163, 184);
+      doc.setFont('helvetica', 'normal');
+      doc.text(b.label, x + 20, 46, { align: 'center' });
+    });
+
+    // Disclaimer
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('⚠  This report is for educational and informational purposes only. It does not constitute medical advice. Consult a qualified healthcare professional for any health concerns.', margin, 55, { maxWidth: pageW - 2*margin });
+
+    // ── Page 1: Top 50 findings table ─────────────────────────
+    const top100 = traits.slice(0, 100);
+    const tableData = top100.map((t, i) => [
+      i + 1,
+      (t.trait_name || '—').slice(0, 42),
+      (t.gene || '—').slice(0, 12),
+      (t.rsid || '—').slice(0, 14),
+      (t.risk_label || t.clinical_sig || t.classification || '—').slice(0, 18),
+      (TraitUI._sourceLabel(t)).slice(0, 14),
+    ]);
+
+    doc.autoTable({
+      startY: 60,
+      head: [['#', 'Finding / Trait', 'Gene', 'Variant', 'Significance', 'Source']],
+      body: tableData.slice(0, 50),
+      theme: 'grid',
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2.2,
+        textColor: [203, 213, 225],
+        lineColor: [30, 41, 59],
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: [12, 26, 46],
+        textColor: [14, 165, 233],
+        fontSize: 7.5,
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: { fillColor: [10, 22, 40] },
+      bodyStyles: { fillColor: [7, 15, 29] },
+      columnStyles: {
+        0: { cellWidth: 7, halign: 'center' },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 24 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 22 },
+      },
+      margin: { left: margin, right: margin },
+    });
+
+    // ── Page 2: Findings 51–100 ────────────────────────────────
+    if (top100.length > 50) {
+      doc.addPage();
+
+      doc.setFillColor(7, 15, 29);
+      doc.rect(0, 0, pageW, 18, 'F');
+      doc.setFontSize(12);
+      doc.setTextColor(14, 165, 233);
+      doc.setFont('helvetica', 'bold');
+      doc.text('HealthAgent Genomic Report — Continued', margin, 11);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Genome Ref: ${dnaRef}`, pageW - margin, 11, { align: 'right' });
+
+      doc.autoTable({
+        startY: 22,
+        head: [['#', 'Finding / Trait', 'Gene', 'Variant', 'Significance', 'Source']],
+        body: tableData.slice(50, 100),
+        theme: 'grid',
+        styles: {
+          fontSize: 7.5,
+          cellPadding: 2.2,
+          textColor: [203, 213, 225],
+          lineColor: [30, 41, 59],
+          lineWidth: 0.2,
+        },
+        headStyles: {
+          fillColor: [12, 26, 46],
+          textColor: [14, 165, 233],
+          fontSize: 7.5,
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: { fillColor: [10, 22, 40] },
+        bodyStyles: { fillColor: [7, 15, 29] },
+        columnStyles: {
+          0: { cellWidth: 7, halign: 'center' },
+          1: { cellWidth: 70 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 24 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 22 },
+        },
+        margin: { left: margin, right: margin },
+      });
+    }
+
+    // Footer on all pages
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      doc.setFontSize(6.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Page ${p} of ${pageCount}   ·   HealthAgent Genomic Wellness Platform   ·   healthagent.io`, pageW / 2, pageH - 6, { align: 'center' });
+    }
+
+    const safeDate = new Date().toISOString().slice(0,10);
+    const safeRef  = (dnaRef || 'unknown').replace(/[^A-Z0-9-]/gi, '-');
+    doc.save(`HealthAgent_Report_${safeRef}_${safeDate}.pdf`);
+
+  } catch(err) {
+    alert('PDF generation failed: ' + err.message + '\n\nMake sure jsPDF loaded correctly.');
+    console.error(err);
+  } finally {
+    if (btn) { btn.textContent = '📄 Generate Report'; btn.disabled = false; }
+  }
+}
+
 // ── Clear all personal data ────────────────────────────────────────
 async function clearAllData() {
   if (!confirm('Delete all your DNA data from this device? This cannot be undone.')) return;
@@ -4957,6 +5649,15 @@ async function clearAllData() {
   const footer = document.getElementById('db-status-footer');
   if (footer) footer.style.display = 'none';
   document.getElementById('clear-data-btn').style.display = 'none';
+  const rb = document.getElementById('report-btn');
+  if (rb) rb.classList.remove('visible');
+  const refBar = document.getElementById('dna-ref-bar');
+  if (refBar) refBar.classList.remove('visible');
+  // Restore hero sub text
+  const heroSub = document.getElementById('hero-sub-text');
+  if (heroSub) heroSub.style.display = '';
+  const heroTitle = document.getElementById('hero-title-text');
+  if (heroTitle) heroTitle.textContent = 'Discover what your DNA says about you';
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -5101,5 +5802,33 @@ const DBFooter = {
   <div class="db-footer-grid"></div>
   <div class="db-footer-meta">Loading…</div>
 </footer>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     CARD DETAIL MODAL
+═══════════════════════════════════════════════════════════════ -->
+<div id="card-modal-overlay" onclick="if(event.target===this)closeCardModal()">
+  <div id="card-modal" role="dialog" aria-modal="true">
+    <div id="card-modal-header">
+      <div id="card-modal-icon">🧬</div>
+      <div style="flex:1;min-width:0;">
+        <div id="card-modal-title">—</div>
+        <div id="card-modal-meta">—</div>
+      </div>
+      <button id="card-modal-close" onclick="closeCardModal()">✕ Close</button>
+    </div>
+    <div id="card-modal-body">
+      <!-- dynamic content injected by openCardModal() -->
+    </div>
+    <div id="card-modal-footer">
+      <span id="card-modal-source-pill"></span>
+      <span id="card-modal-gene" style="font-family:monospace;font-size:0.75rem;color:var(--muted)"></span>
+      <span id="card-modal-rsid" style="font-family:monospace;font-size:0.72rem;color:var(--muted);margin-left:auto"></span>
+    </div>
+  </div>
+</div>
+
+<!-- jsPDF + AutoTable for PDF report generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </body>
 </html>

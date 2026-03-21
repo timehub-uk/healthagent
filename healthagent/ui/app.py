@@ -27,6 +27,11 @@ from healthagent.databases.downloader import (
     download_ensembl_consequences,
     download_finngen,
     download_opentargets,
+    download_clingen,
+    download_gnomad,
+    download_gtex,
+    download_reactome,
+    download_uniprot,
 )
 from healthagent.health_traits import analyze_profile, invalidate_cache as _invalidate_analysis_cache
 from healthagent.databases.tcga_client import query_tcga_for_rsids, get_cached_tcga
@@ -71,6 +76,7 @@ _db_initialized: bool = False
 _DOWNLOAD_TASKS = [
     "wellness", "ensembl", "gwas", "clinvar", "pharmgkb",
     "disgenet", "opentargets", "finngen",
+    "clingen", "gnomad", "gtex", "reactome", "uniprot",
 ]
 _dl_progress: dict = {
     "active":       False,
@@ -231,6 +237,7 @@ def _run_full_update():
         ("disgenet",    download_disgenet),
         ("opentargets", download_opentargets),
         ("finngen",     download_finngen),
+        ("clingen",     download_clingen),
     ]
     with _TPE(max_workers=4, thread_name_prefix="ha-dl") as pool:
         futures = {pool.submit(_step, src, fn): src for src, fn in parallel_tasks}
@@ -239,6 +246,21 @@ def _run_full_update():
                 fut.result()
             except Exception as e:
                 log.error(f"[DB] parallel download error: {e}")
+
+    # Phase 3 — per-gene/rsid enrichment (uses Phase 2 gene lists as seed)
+    enrichment_tasks = [
+        ("gnomad",   download_gnomad),
+        ("gtex",     download_gtex),
+        ("reactome", download_reactome),
+        ("uniprot",  download_uniprot),
+    ]
+    with _TPE(max_workers=2, thread_name_prefix="ha-enrich") as pool:
+        futures = {pool.submit(_step, src, fn): src for src, fn in enrichment_tasks}
+        for fut in futures:
+            try:
+                fut.result()
+            except Exception as e:
+                log.error(f"[DB] enrichment error: {e}")
 
     _dl_progress["active"] = False
     _dl_progress["overall_pct"] = 100
